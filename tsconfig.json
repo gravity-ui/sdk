@@ -1,19 +1,17 @@
 {
   "extends": "@gravity-ui/tsconfig/tsconfig",
   "compilerOptions": {
+    "module": "es2015",
     "declaration": true,
-    "resolveJsonModule": true,
-    "outDir": "dist",
-    "module": "esnext",
-    "jsx": "react"
+    "allowJs": false,
+    "outDir": "build"
   },
   "include": [
-    "src/**/*.ts",
-    "src/**/*.tsx"
+    "lib/**/*.ts"
   ],
   "exclude": [
-    "**/__tests__",
-    "**/*.test.ts",
-    "**/*.test.tsx",
+    "node_modules",
+    "lib/**/*.test.ts",
+    "lib/__mocks__",
   ]
 }
