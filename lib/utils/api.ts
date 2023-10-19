@@ -5,9 +5,26 @@ import {GatewayError} from '../models/common';
 
 import {parseError} from './common';
 
+export type ApiOptions = AxiosWrapperOptions & {
+    updateCsrfEnabled?: boolean;
+};
+
 export default class Api extends AxiosWrapper {
-    constructor(props: AxiosWrapperOptions = {}, handleRequestError?: (error: unknown) => any) {
+    constructor(
+        {updateCsrfEnabled, ...props}: ApiOptions = {},
+        handleRequestError?: (error: unknown) => any,
+    ) {
         super(props);
+
+        this._axios.interceptors.response.use(null, async (error) => {
+            const {config} = error;
+
+            if (updateCsrfEnabled && config && error.response?.status === 419) {
+                return this._axios(config);
+            }
+
+            return Promise.reject(error);
+        });
 
         axiosRetry(this._axios, {
             retries: 0,
