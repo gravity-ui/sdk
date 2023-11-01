@@ -5,6 +5,9 @@ import {GatewayError} from '../models/common';
 
 import {parseError} from './common';
 
+// Symbols are not preserved in the Axios config
+const csrfRetryKey = '__ CSRF retry';
+
 export type ApiOptions = AxiosWrapperOptions & {
     updateCsrfEnabled?: boolean;
 };
@@ -16,15 +19,20 @@ export default class Api extends AxiosWrapper {
     ) {
         super(props);
 
-        this._axios.interceptors.response.use(null, async (error) => {
-            const {config} = error;
+        if (updateCsrfEnabled) {
+            this._axios.interceptors.response.use(null, async (error) => {
+                const {config} = error;
 
-            if (updateCsrfEnabled && config && error.response?.status === 419) {
-                return this._axios(config);
-            }
+                if (config && !config[csrfRetryKey] && error.response?.status === 419) {
+                    return this._axios({
+                        ...config,
+                        [csrfRetryKey]: true,
+                    });
+                }
 
-            return Promise.reject(error);
-        });
+                return Promise.reject(error);
+            });
+        }
 
         axiosRetry(this._axios, {
             retries: 0,
