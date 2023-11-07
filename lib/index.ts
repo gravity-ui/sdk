@@ -13,6 +13,7 @@ import Api from './utils/api';
 export interface SdkConfig {
     axiosConfig?: AxiosRequestConfig;
     csrfToken?: string;
+    updateCsrfEnabled?: boolean;
     endpoint?: string;
     handleRequestError?: (error: unknown) => any;
     prepareRequestOptions?: (
@@ -157,7 +158,13 @@ export default function sdkFactory<TSchema extends SchemasByScope>(config?: SdkC
     const axiosConfig = sdkConfig.axiosConfig;
     const endpoint = sdkConfig.endpoint || DEFAULT_ENDPOINT;
 
-    const api = new Api({config: axiosConfig}, sdkConfig?.handleRequestError);
+    const api = new Api(
+        {
+            updateCsrfEnabled: sdkConfig.updateCsrfEnabled,
+            config: axiosConfig,
+        },
+        sdkConfig?.handleRequestError,
+    );
     if (sdkConfig.csrfToken) {
         api.setCSRFToken(sdkConfig.csrfToken);
     }
