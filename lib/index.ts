@@ -10,6 +10,19 @@ import {CancellablePromise} from './CancellablePromise';
 import {Lang} from './constants';
 import Api from './utils/api';
 
+export interface SdkActionOptions {
+    concurrentId?: string;
+    collectRequest?: boolean;
+    retries?: number;
+    timeout?: number;
+    headers?: Record<string, unknown>;
+    signal?: AbortSignal;
+}
+
+export interface SdkActionFunc<TRequestData, TResponseData> {
+    (data: TRequestData, options?: SdkActionOptions): CancellablePromise<TResponseData>;
+}
+
 export interface SdkConfig {
     axiosConfig?: AxiosRequestConfig;
     csrfToken?: string;
@@ -22,15 +35,12 @@ export interface SdkConfig {
         action: string | null,
         options?: SdkActionOptions,
     ) => SdkActionOptions | undefined;
-}
-
-export interface SdkActionOptions {
-    concurrentId?: string;
-    collectRequest?: boolean;
-    retries?: number;
-    timeout?: number;
-    headers?: Record<string, unknown>;
-    signal?: AbortSignal;
+    decorator?: <TRequestData, TResponseData>(
+        func: SdkActionFunc<TRequestData, TResponseData>,
+        scope?: string,
+        service?: string,
+        action?: string,
+    ) => SdkActionFunc<TRequestData, TResponseData>;
 }
 
 export const generateConcurrentId = (() => {
@@ -39,7 +49,8 @@ export const generateConcurrentId = (() => {
     return () => `sdk-id-${concurrentId++}`;
 })();
 
-const DEFAULT_ENDPOINT = '/api';
+const DEFAULT_ENDPOINT: Required<SdkConfig>['endpoint'] = '/api';
+const DEFAULT_DECORATOR: Required<SdkConfig>['decorator'] = (func) => func;
 const DEFAULT_METHOD = 'POST';
 
 function getRequestOptions(options?: SdkActionOptions, axiosConfig?: AxiosRequestConfig) {
@@ -157,6 +168,7 @@ export default function sdkFactory<TSchema extends SchemasByScope>(config?: SdkC
     const sdkConfig = config || {};
     const axiosConfig = sdkConfig.axiosConfig;
     const endpoint = sdkConfig.endpoint || DEFAULT_ENDPOINT;
+    const decorator = sdkConfig.decorator || DEFAULT_DECORATOR;
 
     const api = new Api(
         {
@@ -165,38 +177,38 @@ export default function sdkFactory<TSchema extends SchemasByScope>(config?: SdkC
         },
         sdkConfig?.handleRequestError,
     );
+
     if (sdkConfig.csrfToken) {
         api.setCSRFToken(sdkConfig.csrfToken);
     }
 
-    const baseSdk = <T>(
-        requestConfig: AxiosRequestConfig,
-        initialOptions?: SdkActionOptions,
-    ): Promise<T> => {
-        const options = sdkConfig.prepareRequestOptions
-            ? sdkConfig.prepareRequestOptions(null, null, null, initialOptions)
-            : initialOptions;
+    const baseSdk = decorator(
+        <T>(requestConfig: AxiosRequestConfig, initialOptions?: SdkActionOptions) => {
+            const options = sdkConfig.prepareRequestOptions
+                ? sdkConfig.prepareRequestOptions(null, null, null, initialOptions)
+                : initialOptions;
 
-        const {
-            url = DEFAULT_ENDPOINT,
-            method = DEFAULT_METHOD,
-            data,
-            params,
-            ...restAxiosConfig
-        } = requestConfig;
-        const requestOptions = getRequestOptions(options, restAxiosConfig);
-
-        return new CancellablePromise<T>(
-            api.request({
-                url,
-                method,
+            const {
+                url = DEFAULT_ENDPOINT,
+                method = DEFAULT_METHOD,
                 data,
                 params,
-                options: requestOptions,
-            }),
-            () => api.cancelRequest(requestOptions.concurrentId),
-        );
-    };
+                ...restAxiosConfig
+            } = requestConfig;
+            const requestOptions = getRequestOptions(options, restAxiosConfig);
+
+            return new CancellablePromise<T>(
+                api.request({
+                    url,
+                    method,
+                    data,
+                    params,
+                    options: requestOptions,
+                }),
+                () => api.cancelRequest(requestOptions.concurrentId),
+            );
+        },
+    );
 
     const baseSdkMethods = {
         cancelRequest(id: string) {
@@ -293,10 +305,15 @@ export default function sdkFactory<TSchema extends SchemasByScope>(config?: SdkC
                                         }
 
                                         if (!(actionName in actions)) {
-                                            actions[actionName] = createSdkAction(
-                                                sdkConfig,
-                                                api,
-                                                endpoint,
+                                            actions[actionName] = decorator(
+                                                createSdkAction(
+                                                    sdkConfig,
+                                                    api,
+                                                    endpoint,
+                                                    scopeOrRootServiceName,
+                                                    serviceOrRootActionName,
+                                                    actionName,
+                                                ),
                                                 scopeOrRootServiceName,
                                                 serviceOrRootActionName,
                                                 actionName,
