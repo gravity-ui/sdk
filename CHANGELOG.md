@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/gravity-ui/sdk/compare/v1.1.0...v1.2.0) (2023-12-01)
+
+
+### Features
+
+* add decorator ([#6](https://github.com/gravity-ui/sdk/issues/6)) ([ad61830](https://github.com/gravity-ui/sdk/commit/ad618309b7eac4d2eb7cbe0c5f9e91d96b897614))
+
 ## [1.1.0](https://github.com/gravity-ui/sdk/compare/v1.0.0...v1.1.0) (2023-11-07)
 
 
