@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.1](https://github.com/gravity-ui/sdk/compare/v1.2.0...v1.2.1) (2024-02-16)
+
+
+### Bug Fixes
+
+* update peerDependency ([#9](https://github.com/gravity-ui/sdk/issues/9)) ([db8985e](https://github.com/gravity-ui/sdk/commit/db8985e20fdd62e98d7e11dd261606bf407c398f))
+
 ## [1.2.0](https://github.com/gravity-ui/sdk/compare/v1.1.0...v1.2.0) (2023-12-01)
 
 
