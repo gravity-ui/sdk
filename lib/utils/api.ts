@@ -24,6 +24,10 @@ export default class Api extends AxiosWrapper {
                 const {config} = error;
 
                 if (config && !config[csrfRetryKey] && error.response?.status === 419) {
+                    if (error.response.headers['x-csrf-token']) {
+                        this.setCSRFToken(error.response.headers['x-csrf-token']);
+                    }
+
                     return this._axios({
                         ...config,
                         [csrfRetryKey]: true,
