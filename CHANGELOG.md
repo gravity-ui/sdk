@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/gravity-ui/sdk/compare/v1.2.1...v1.3.0) (2024-03-27)
+
+
+### Features
+
+* **main:** add support for updating CSRF token from header ([#11](https://github.com/gravity-ui/sdk/issues/11)) ([b1cca85](https://github.com/gravity-ui/sdk/commit/b1cca85f4835268d1a6e514264ba1d8461ee6f19))
+
 ## [1.2.1](https://github.com/gravity-ui/sdk/compare/v1.2.0...v1.2.1) (2024-02-16)
 
 
