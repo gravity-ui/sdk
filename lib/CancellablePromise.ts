@@ -16,6 +16,21 @@ export class CancellablePromise<T = unknown> implements Promise<T> {
         );
     }
 
+    static allSettled<Values extends readonly unknown[] | []>(values: Values) {
+        function cancel() {
+            for (const promise of values as CancellablePromise[]) {
+                promise.cancel();
+            }
+        }
+
+        return new CancellablePromise(
+            Promise.allSettled(values) as unknown as Promise<{
+                -readonly [P in keyof Values]: Awaited<Values[P]>;
+            }>,
+            cancel,
+        );
+    }
+
     static race<Values extends readonly unknown[] | []>(values: Values) {
         function cancel() {
             for (const promise of values as CancellablePromise[]) {
