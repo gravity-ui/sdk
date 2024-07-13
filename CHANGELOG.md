@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.0](https://github.com/gravity-ui/sdk/compare/v1.3.0...v1.4.0) (2024-07-10)
+
+
+### Features
+
+* **CancellablePromise:** add the allSettled static method ([#13](https://github.com/gravity-ui/sdk/issues/13)) ([478ee1a](https://github.com/gravity-ui/sdk/commit/478ee1aa68c7919cc78780d4cc1eba90bcfac634))
+
 ## [1.3.0](https://github.com/gravity-ui/sdk/compare/v1.2.1...v1.3.0) (2024-03-27)
 
 
