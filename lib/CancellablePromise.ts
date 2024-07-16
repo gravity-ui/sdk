@@ -25,7 +25,7 @@ export class CancellablePromise<T = unknown> implements Promise<T> {
 
         return new CancellablePromise(
             Promise.allSettled(values) as unknown as Promise<{
-                -readonly [P in keyof Values]: Awaited<Values[P]>;
+                -readonly [P in keyof Values]: PromiseSettledResult<Awaited<Values[P]>>;
             }>,
             cancel,
         );
