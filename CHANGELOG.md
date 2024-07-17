@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.1](https://github.com/gravity-ui/sdk/compare/v1.4.0...v1.4.1) (2024-07-16)
+
+
+### Bug Fixes
+
+* **CancellablePromise:** allSettled return type ([#15](https://github.com/gravity-ui/sdk/issues/15)) ([ea87568](https://github.com/gravity-ui/sdk/commit/ea875687230a93fb339f62bb4091f1f6009ba4e2))
+
 ## [1.4.0](https://github.com/gravity-ui/sdk/compare/v1.3.0...v1.4.0) (2024-07-10)
 
 
