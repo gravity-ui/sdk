@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.0](https://github.com/gravity-ui/sdk/compare/v1.4.1...v1.5.0) (2024-08-22)
+
+
+### Features
+
+* adds an ability to change CSRF header name ([#17](https://github.com/gravity-ui/sdk/issues/17)) ([a390adb](https://github.com/gravity-ui/sdk/commit/a390adbb6fc59b10b236bb93c83fb340eb7fba6f))
+
 ## [1.4.1](https://github.com/gravity-ui/sdk/compare/v1.4.0...v1.4.1) (2024-07-16)
 
 
