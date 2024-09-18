@@ -5,7 +5,7 @@
 
 ### Bug Fixes
 
-* tune README ([#22](https://github.com/gravity-ui/sdk/issues/22)) ([b12f13c](https://github.com/gravity-ui/sdk/commit/b12f13c916216b58f12e1d132fb656944b666997))
+* @gravity-ui/axios-wrapper version bump ([#21](https://github.com/gravity-ui/sdk/issues/21)) ([fc73562](https://github.com/gravity-ui/sdk/commit/fc73562b2e4546a2658b771e4b900ddee73f043d))
 
 ## [1.5.0](https://github.com/gravity-ui/sdk/compare/v1.4.1...v1.5.0) (2024-08-22)
 
