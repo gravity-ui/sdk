@@ -61,7 +61,7 @@ interface SdkConfig {
 In the code, the invocation of the SDK method looks like this:
 
 ```javascript
-sdk.<scope>.<service>.<action>(data, options); // => Returns a CancelablePromise
+sdk.<scope>.<service>.<action>(data, options); // => returns a CancelablePromise
 ```
 
 If the default endpoint value `/api` is specified, the full request path will look like this:
