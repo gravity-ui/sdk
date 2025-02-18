@@ -9,9 +9,9 @@ import type {AxiosRequestConfig} from 'axios';
 import {CancellablePromise} from './CancellablePromise';
 import {Lang} from './constants';
 import Api, {createScopeServicePath} from './utils/api';
-import type {RequestResponseInterceptors} from './utils/api';
+import type {AxiosInterceptors} from './utils/api';
 
-export type {RequestResponseInterceptors} from './utils/api';
+export type {AxiosInterceptors} from './utils/api';
 
 export interface SdkActionOptions {
     concurrentId?: string;
@@ -29,7 +29,7 @@ export interface SdkActionFunc<TRequestData, TResponseData> {
 export type ScopeServiceQueryInterceptors = {
     scope?: string;
     service: string;
-    interceptors: RequestResponseInterceptors | RequestResponseInterceptors[];
+    interceptors: AxiosInterceptors | AxiosInterceptors[];
 };
 
 export interface SdkConfig {
@@ -50,7 +50,7 @@ export interface SdkConfig {
         service?: string,
         action?: string,
     ) => SdkActionFunc<TRequestData, TResponseData>;
-    queriesInterceptors?: ScopeServiceQueryInterceptors[];
+    axiosInterceptors?: ScopeServiceQueryInterceptors[];
 }
 
 export const generateConcurrentId = (() => {
@@ -180,8 +180,8 @@ export default function sdkFactory<TSchema extends SchemasByScope>(config?: SdkC
     const endpoint = sdkConfig.endpoint || DEFAULT_ENDPOINT;
     const decorator = sdkConfig.decorator || DEFAULT_DECORATOR;
 
-    const queriesInterceptors = sdkConfig.queriesInterceptors
-        ? sdkConfig.queriesInterceptors.reduce((result, item) => {
+    const axiosInterceptors = sdkConfig.axiosInterceptors
+        ? sdkConfig.axiosInterceptors.reduce((result, item) => {
               const path = createScopeServicePath(item.service, item.scope);
               const interceptors = Array.isArray(item.interceptors)
                   ? item.interceptors
@@ -193,13 +193,13 @@ export default function sdkFactory<TSchema extends SchemasByScope>(config?: SdkC
               result[path].push(...interceptors);
 
               return result;
-          }, {} as Record<string, RequestResponseInterceptors[]>)
+          }, {} as Record<string, AxiosInterceptors[]>)
         : undefined;
 
     const api = new Api(
         {
             updateCsrfEnabled: sdkConfig.updateCsrfEnabled,
-            queriesInterceptors,
+            axiosInterceptors,
             config: axiosConfig,
         },
         sdkConfig?.handleRequestError,

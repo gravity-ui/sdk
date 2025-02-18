@@ -10,18 +10,18 @@ const csrfRetryKey = '__ CSRF retry';
 
 const urlRegexp = /\/(?<api>\w+)\/(?<scope>\w+)\/(?<service>\w+)\/(?<action>\w+)/i;
 
-export interface RequestResponseInterceptors {
+export interface AxiosInterceptors {
     requestInterceptorSuccess?: (config: any) => Promise<any>;
     requestInterceptorError?: (error: any) => Promise<any>;
     responseInterceptorSuccess?: (data: any) => Promise<any>;
     responseInterceptorError?: (error: any) => Promise<any>;
 }
 
-type QueriesInterceptors = Record<string, RequestResponseInterceptors[]>;
+type ServicesWithAxiosInterceptors = Record<string, AxiosInterceptors[]>;
 
 export type ApiOptions = AxiosWrapperOptions & {
     updateCsrfEnabled?: boolean;
-    queriesInterceptors?: QueriesInterceptors;
+    axiosInterceptors?: ServicesWithAxiosInterceptors;
 };
 
 export function createScopeServicePath(service: string, scope?: string): string {
@@ -36,17 +36,17 @@ export function getScopeServicePath(url: string): string {
 
 type InterceptorsChainParams = {
     url?: string;
-    queriesInterceptors?: QueriesInterceptors;
+    axiosInterceptors?: ServicesWithAxiosInterceptors;
     queryData: any;
     success: boolean;
     interceptorSelector: (
-        interceptors: RequestResponseInterceptors,
+        interceptors: AxiosInterceptors,
     ) => ((data: any) => Promise<any>) | undefined;
 };
 
 export function makeInterceptorsChain({
     url,
-    queriesInterceptors,
+    axiosInterceptors,
     queryData,
     success,
     interceptorSelector,
@@ -59,7 +59,7 @@ export function makeInterceptorsChain({
 
     const path = getScopeServicePath(url);
 
-    for (const interceptors of queriesInterceptors?.[path] || []) {
+    for (const interceptors of axiosInterceptors?.[path] || []) {
         const interceptor = interceptorSelector(interceptors);
 
         if (interceptor) {
@@ -74,7 +74,7 @@ export function makeInterceptorsChain({
 
 export default class Api extends AxiosWrapper {
     constructor(
-        {updateCsrfEnabled, queriesInterceptors, ...props}: ApiOptions = {},
+        {updateCsrfEnabled, axiosInterceptors, ...props}: ApiOptions = {},
         handleRequestError?: (error: unknown) => any,
     ) {
         super(props);
@@ -82,7 +82,7 @@ export default class Api extends AxiosWrapper {
         const requestSuccess = (config: any) => {
             return makeInterceptorsChain({
                 url: config?.url,
-                queriesInterceptors,
+                axiosInterceptors,
                 queryData: config,
                 success: true,
                 interceptorSelector: (interceptors) => interceptors.requestInterceptorSuccess,
@@ -92,7 +92,7 @@ export default class Api extends AxiosWrapper {
         const requestError = (error: any) => {
             return makeInterceptorsChain({
                 url: error?.config?.url,
-                queriesInterceptors,
+                axiosInterceptors,
                 queryData: error,
                 success: false,
                 interceptorSelector: (interceptors) => interceptors.requestInterceptorError,
@@ -102,7 +102,7 @@ export default class Api extends AxiosWrapper {
         const responseSuccess = (data: any) => {
             return makeInterceptorsChain({
                 url: data?.config?.url,
-                queriesInterceptors,
+                axiosInterceptors,
                 queryData: data,
                 success: true,
                 interceptorSelector: (interceptors) => interceptors.responseInterceptorSuccess,
@@ -112,7 +112,7 @@ export default class Api extends AxiosWrapper {
         const responseError = (error: any) => {
             let result: Promise<any> = makeInterceptorsChain({
                 url: error?.config?.url,
-                queriesInterceptors,
+                axiosInterceptors,
                 queryData: error,
                 success: false,
                 interceptorSelector: (interceptors) => interceptors.responseInterceptorError,
