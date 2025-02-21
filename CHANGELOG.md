@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.0](https://github.com/gravity-ui/sdk/compare/v1.5.1...v1.6.0) (2025-02-21)
+
+
+### Features
+
+* added the ability to connect request interceptors ([#25](https://github.com/gravity-ui/sdk/issues/25)) ([7903aed](https://github.com/gravity-ui/sdk/commit/7903aed1833935f7f02b9139a3257aff7809f41a))
+
 ## [1.5.1](https://github.com/gravity-ui/sdk/compare/v1.5.0...v1.5.1) (2024-09-18)
 
 
