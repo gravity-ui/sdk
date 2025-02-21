@@ -8,37 +8,144 @@ import {parseError} from './common';
 // Symbols are not preserved in the Axios config
 const csrfRetryKey = '__ CSRF retry';
 
+const urlRegexp = /\/(?<api>\w+)\/(?<scope>\w+)\/(?<service>\w+)\/(?<action>\w+)/i;
+
+export interface AxiosInterceptors {
+    requestInterceptorSuccess?: (config: any) => Promise<any>;
+    requestInterceptorError?: (error: any) => Promise<any>;
+    responseInterceptorSuccess?: (data: any) => Promise<any>;
+    responseInterceptorError?: (error: any) => Promise<any>;
+}
+
+type ServicesWithAxiosInterceptors = Record<string, AxiosInterceptors[]>;
+
 export type ApiOptions = AxiosWrapperOptions & {
     updateCsrfEnabled?: boolean;
+    axiosInterceptors?: ServicesWithAxiosInterceptors;
 };
+
+export function createScopeServicePath(service: string, scope?: string): string {
+    return `${scope ?? 'root'}/${service}`;
+}
+
+export function getScopeServicePath(url: string): string {
+    const groups = url.match(urlRegexp)?.groups;
+
+    return groups ? createScopeServicePath(groups.service, groups.scope) : '';
+}
+
+type InterceptorsChainParams = {
+    url?: string;
+    axiosInterceptors?: ServicesWithAxiosInterceptors;
+    queryData: any;
+    success: boolean;
+    interceptorSelector: (
+        interceptors: AxiosInterceptors,
+    ) => ((data: any) => Promise<any>) | undefined;
+};
+
+export function makeInterceptorsChain({
+    url,
+    axiosInterceptors,
+    queryData,
+    success,
+    interceptorSelector,
+}: InterceptorsChainParams): Promise<any> {
+    let result: Promise<any> = success ? Promise.resolve(queryData) : Promise.reject(queryData);
+
+    if (!url) {
+        return result;
+    }
+
+    const path = getScopeServicePath(url);
+
+    for (const interceptors of axiosInterceptors?.[path] || []) {
+        const interceptor = interceptorSelector(interceptors);
+
+        if (interceptor) {
+            result = success
+                ? result.then(async (data) => await interceptor(data))
+                : result.catch(async (data) => await interceptor(data));
+        }
+    }
+
+    return result;
+}
 
 export default class Api extends AxiosWrapper {
     constructor(
-        {updateCsrfEnabled, ...props}: ApiOptions = {},
+        {updateCsrfEnabled, axiosInterceptors, ...props}: ApiOptions = {},
         handleRequestError?: (error: unknown) => any,
     ) {
         super(props);
 
-        if (updateCsrfEnabled) {
-            this._axios.interceptors.response.use(null, async (error) => {
-                const {config} = error;
+        const requestSuccess = (config: any) => {
+            return makeInterceptorsChain({
+                url: config?.url,
+                axiosInterceptors,
+                queryData: config,
+                success: true,
+                interceptorSelector: (interceptors) => interceptors.requestInterceptorSuccess,
+            });
+        };
 
-                if (config && !config[csrfRetryKey] && error.response?.status === 419) {
-                    const csrfHeaderName = (this.csrfHeaderName || 'x-csrf-token').toLowerCase();
+        const requestError = (error: any) => {
+            return makeInterceptorsChain({
+                url: error?.config?.url,
+                axiosInterceptors,
+                queryData: error,
+                success: false,
+                interceptorSelector: (interceptors) => interceptors.requestInterceptorError,
+            });
+        };
 
-                    if (error.response.headers[csrfHeaderName]) {
-                        this.setCSRFToken(error.response.headers[csrfHeaderName]);
+        const responseSuccess = (data: any) => {
+            return makeInterceptorsChain({
+                url: data?.config?.url,
+                axiosInterceptors,
+                queryData: data,
+                success: true,
+                interceptorSelector: (interceptors) => interceptors.responseInterceptorSuccess,
+            });
+        };
+
+        const responseError = (error: any) => {
+            let result: Promise<any> = makeInterceptorsChain({
+                url: error?.config?.url,
+                axiosInterceptors,
+                queryData: error,
+                success: false,
+                interceptorSelector: (interceptors) => interceptors.responseInterceptorError,
+            });
+
+            if (updateCsrfEnabled) {
+                result = result.catch(async (error) => {
+                    const {config} = error;
+
+                    if (config && !config[csrfRetryKey] && error.response?.status === 419) {
+                        const csrfHeaderName = (
+                            this.csrfHeaderName || 'x-csrf-token'
+                        ).toLowerCase();
+
+                        if (error.response.headers[csrfHeaderName]) {
+                            this.setCSRFToken(error.response.headers[csrfHeaderName]);
+                        }
+
+                        return this._axios({
+                            ...config,
+                            [csrfRetryKey]: true,
+                        });
                     }
 
-                    return this._axios({
-                        ...config,
-                        [csrfRetryKey]: true,
-                    });
-                }
+                    return Promise.reject(error);
+                });
+            }
 
-                return Promise.reject(error);
-            });
-        }
+            return result;
+        };
+
+        this._axios.interceptors.request.use(requestSuccess, requestError);
+        this._axios.interceptors.response.use(responseSuccess, responseError);
 
         axiosRetry(this._axios, {
             retries: 0,

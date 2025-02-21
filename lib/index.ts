@@ -8,7 +8,10 @@ import type {AxiosRequestConfig} from 'axios';
 
 import {CancellablePromise} from './CancellablePromise';
 import {Lang} from './constants';
-import Api from './utils/api';
+import Api, {createScopeServicePath} from './utils/api';
+import type {AxiosInterceptors} from './utils/api';
+
+export type {AxiosInterceptors} from './utils/api';
 
 export interface SdkActionOptions {
     concurrentId?: string;
@@ -22,6 +25,12 @@ export interface SdkActionOptions {
 export interface SdkActionFunc<TRequestData, TResponseData> {
     (data: TRequestData, options?: SdkActionOptions): CancellablePromise<TResponseData>;
 }
+
+export type ScopeServiceQueryInterceptors = {
+    scope?: string;
+    service: string;
+    interceptors: AxiosInterceptors | AxiosInterceptors[];
+};
 
 export interface SdkConfig {
     axiosConfig?: AxiosRequestConfig;
@@ -41,6 +50,7 @@ export interface SdkConfig {
         service?: string,
         action?: string,
     ) => SdkActionFunc<TRequestData, TResponseData>;
+    axiosInterceptors?: ScopeServiceQueryInterceptors[];
 }
 
 export const generateConcurrentId = (() => {
@@ -170,9 +180,26 @@ export default function sdkFactory<TSchema extends SchemasByScope>(config?: SdkC
     const endpoint = sdkConfig.endpoint || DEFAULT_ENDPOINT;
     const decorator = sdkConfig.decorator || DEFAULT_DECORATOR;
 
+    const axiosInterceptors = sdkConfig.axiosInterceptors
+        ? sdkConfig.axiosInterceptors.reduce((result, item) => {
+              const path = createScopeServicePath(item.service, item.scope);
+              const interceptors = Array.isArray(item.interceptors)
+                  ? item.interceptors
+                  : [item.interceptors];
+
+              if (!result[path]) {
+                  result[path] = [];
+              }
+              result[path].push(...interceptors);
+
+              return result;
+          }, {} as Record<string, AxiosInterceptors[]>)
+        : undefined;
+
     const api = new Api(
         {
             updateCsrfEnabled: sdkConfig.updateCsrfEnabled,
+            axiosInterceptors,
             config: axiosConfig,
         },
         sdkConfig?.handleRequestError,
