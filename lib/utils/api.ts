@@ -1,7 +1,7 @@
-import AxiosWrapper, {AxiosWrapperOptions} from '@gravity-ui/axios-wrapper';
+import AxiosWrapper, {type AxiosWrapperOptions} from '@gravity-ui/axios-wrapper';
 import axiosRetry from 'axios-retry';
 
-import {GatewayError} from '../models/common';
+import type {GatewayError} from '../models/common';
 
 import {parseError} from './common';
 
