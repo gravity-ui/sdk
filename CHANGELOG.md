@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.0.0](https://github.com/gravity-ui/sdk/compare/v1.6.0...v2.0.0) (2025-05-06)
+
+
+### ⚠ BREAKING CHANGES
+
+* update ts version and build cjs and esm separatelly
+
+### Features
+
+* update ts version and build cjs and esm separatelly ([fa520fb](https://github.com/gravity-ui/sdk/commit/fa520fb0ebc7ef4a2d0921d41d29d974aa009af6))
+
 ## [1.6.0](https://github.com/gravity-ui/sdk/compare/v1.5.1...v1.6.0) (2025-02-21)
 
 
