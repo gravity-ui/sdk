@@ -1,6 +1,6 @@
 import _get from 'lodash/get';
 
-import {GatewayError} from '../models/common';
+import type {GatewayError} from '../models/common';
 
 export function parseError(errorResponse: unknown) {
     let parsedError = {} as GatewayError;
