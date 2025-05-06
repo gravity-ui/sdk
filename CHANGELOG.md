@@ -5,7 +5,7 @@
 
 ### ⚠ BREAKING CHANGES
 
-* update ts version and build cjs and esm separatelly
+* update ts version and build cjs and esm modules separatelly
 
 ### Features
 
