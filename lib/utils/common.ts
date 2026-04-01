@@ -1,5 +1,6 @@
 import _get from 'lodash/get';
 
+import {ErrorCode} from '../constants';
 import type {GatewayError} from '../models/common';
 
 export function parseError(errorResponse: unknown) {
@@ -11,7 +12,7 @@ export function parseError(errorResponse: unknown) {
         if (typeof errorData === 'string') {
             parsedError = {
                 status: _get(errorResponse, 'status', 500),
-                code: 'SDK_REQUEST_ERROR',
+                code: ErrorCode.SDKRequestError,
                 message: 'SDK request error',
                 details: {
                     title: _get(errorResponse, 'status'),
@@ -21,7 +22,7 @@ export function parseError(errorResponse: unknown) {
         } else {
             parsedError = {
                 status: _get(errorData, 'status', 500),
-                code: _get(errorData, 'code', 'SDK_REQUEST_ERROR'),
+                code: _get(errorData, 'code', ErrorCode.SDKRequestError),
                 message: _get(errorData, 'message', 'SDK request error'),
                 details: _get(errorData, 'details'),
                 debug: _get(errorData, 'debug'),
@@ -30,11 +31,19 @@ export function parseError(errorResponse: unknown) {
     } else {
         parsedError = {
             status: 500,
-            code: 'SDK_REQUEST_ERROR',
+            code: ErrorCode.SDKRequestError,
             message: 'SDK request error',
             details: errorResponse as any,
         };
     }
 
     return parsedError;
+}
+
+export function isNeedResetError(
+    errorResponse: unknown,
+): errorResponse is {data: {code: ErrorCode.AccountChanged | ErrorCode.AccountChanged}} {
+    const code = _get(errorResponse, 'data.code');
+
+    return code === ErrorCode.AccountChanged || code === ErrorCode.SessionExpired;
 }

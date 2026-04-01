@@ -13,6 +13,10 @@ import type {AxiosInterceptors} from './utils/api';
 
 export type {AxiosInterceptors} from './utils/api';
 
+export {isNeedResetError} from './utils/common';
+
+export {ErrorCode} from './constants';
+
 export interface SdkActionOptions {
     concurrentId?: string;
     collectRequest?: boolean;
