@@ -42,7 +42,7 @@ export function parseError(errorResponse: unknown) {
 
 export function isNeedResetError(
     errorResponse: unknown,
-): errorResponse is {data: {code: ErrorCode.AccountChanged | ErrorCode.AccountChanged}} {
+): errorResponse is {data: {code: ErrorCode.AccountChanged | ErrorCode.SessionExpired}} {
     const code = _get(errorResponse, 'data.code');
 
     return code === ErrorCode.AccountChanged || code === ErrorCode.SessionExpired;
