@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.1.0](https://github.com/gravity-ui/sdk/compare/v2.0.0...v2.1.0) (2026-04-24)
+
+
+### Features
+
+* add function for checking ACCOUNT_CHANGED and SESSION_EXPIRED codes ([#30](https://github.com/gravity-ui/sdk/issues/30)) ([a62b09c](https://github.com/gravity-ui/sdk/commit/a62b09c4e3af36c7cb439b7202e8a59173343eec))
+
+
+### Bug Fixes
+
+* correct return type annotation in isNeedResetError (AccountChanged -&gt; SessionExpired) ([#32](https://github.com/gravity-ui/sdk/issues/32)) ([40e4157](https://github.com/gravity-ui/sdk/commit/40e41576fe2383ddb39e2122cb14665ee5c7bccf))
+
 ## [2.0.0](https://github.com/gravity-ui/sdk/compare/v1.6.0...v2.0.0) (2025-05-06)
 
 
