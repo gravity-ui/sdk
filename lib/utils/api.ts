@@ -1,12 +1,20 @@
-import AxiosWrapper, {type AxiosWrapperOptions} from '@gravity-ui/axios-wrapper';
+import AxiosWrapperModule, {type AxiosWrapperOptions} from '@gravity-ui/axios-wrapper';
 import axiosRetry from 'axios-retry';
 
 import type {GatewayError} from '../models/common';
 
 import {parseError} from './common';
 
+// axios-wrapper has no "exports": native Node ESM gets its CJS module object instead of the class
+type AxiosWrapperClass = typeof AxiosWrapperModule extends {default: infer T}
+    ? T
+    : typeof AxiosWrapperModule;
+const AxiosWrapper: AxiosWrapperClass =
+    (AxiosWrapperModule as unknown as {default?: AxiosWrapperClass}).default ?? AxiosWrapperModule;
+
 // Symbols are not preserved in the Axios config
 const csrfRetryKey = '__ CSRF retry';
+export const scopeServicePathKey = '__ SDK scope/service path';
 
 const urlRegexp = /\/(?<api>\w+)\/(?<scope>\w+)\/(?<service>\w+)\/(?<action>\w+)/i;
 
@@ -35,7 +43,7 @@ export function getScopeServicePath(url: string): string {
 }
 
 type InterceptorsChainParams = {
-    url?: string;
+    config?: {url?: string; [scopeServicePathKey]?: string};
     axiosInterceptors?: ServicesWithAxiosInterceptors;
     queryData: any;
     success: boolean;
@@ -45,7 +53,7 @@ type InterceptorsChainParams = {
 };
 
 export function makeInterceptorsChain({
-    url,
+    config,
     axiosInterceptors,
     queryData,
     success,
@@ -53,11 +61,11 @@ export function makeInterceptorsChain({
 }: InterceptorsChainParams): Promise<any> {
     let result: Promise<any> = success ? Promise.resolve(queryData) : Promise.reject(queryData);
 
-    if (!url) {
+    const path = config?.[scopeServicePathKey] ?? (config?.url && getScopeServicePath(config.url));
+
+    if (!path) {
         return result;
     }
-
-    const path = getScopeServicePath(url);
 
     for (const interceptors of axiosInterceptors?.[path] || []) {
         const interceptor = interceptorSelector(interceptors);
@@ -81,7 +89,7 @@ export default class Api extends AxiosWrapper {
 
         const requestSuccess = (config: any) => {
             return makeInterceptorsChain({
-                url: config?.url,
+                config,
                 axiosInterceptors,
                 queryData: config,
                 success: true,
@@ -91,7 +99,7 @@ export default class Api extends AxiosWrapper {
 
         const requestError = (error: any) => {
             return makeInterceptorsChain({
-                url: error?.config?.url,
+                config: error?.config,
                 axiosInterceptors,
                 queryData: error,
                 success: false,
@@ -101,7 +109,7 @@ export default class Api extends AxiosWrapper {
 
         const responseSuccess = (data: any) => {
             return makeInterceptorsChain({
-                url: data?.config?.url,
+                config: data?.config,
                 axiosInterceptors,
                 queryData: data,
                 success: true,
@@ -111,7 +119,7 @@ export default class Api extends AxiosWrapper {
 
         const responseError = (error: any) => {
             let result: Promise<any> = makeInterceptorsChain({
-                url: error?.config?.url,
+                config: error?.config,
                 axiosInterceptors,
                 queryData: error,
                 success: false,
@@ -127,12 +135,28 @@ export default class Api extends AxiosWrapper {
                             this.csrfHeaderName || 'x-csrf-token'
                         ).toLowerCase();
 
-                        if (error.response.headers[csrfHeaderName]) {
-                            this.setCSRFToken(error.response.headers[csrfHeaderName]);
+                        const newToken = error.response.headers[csrfHeaderName];
+
+                        if (newToken) {
+                            this.setCSRFToken(newToken);
+                            // Retry headers override defaults: replace the stale token here.
+                            // Don't construct AxiosHeaders: SDK and axios-wrapper may load different axios instances
+                            if (typeof config.headers?.set === 'function') {
+                                config.headers.set(this.csrfHeaderName, newToken);
+                            } else {
+                                config.headers = Object.fromEntries(
+                                    Object.entries(config.headers ?? {}).filter(
+                                        ([name]) => name.toLowerCase() !== csrfHeaderName,
+                                    ),
+                                );
+                                config.headers[this.csrfHeaderName] = newToken;
+                            }
                         }
 
                         return this._axios({
                             ...config,
+                            // data is already serialized by the first attempt
+                            transformRequest: [(data: unknown) => data],
                             [csrfRetryKey]: true,
                         });
                     }
@@ -151,7 +175,7 @@ export default class Api extends AxiosWrapper {
             retries: 0,
             retryDelay: axiosRetry.exponentialDelay,
             retryCondition: (error) => {
-                if (!error.config) {
+                if (!error.config || error.code === 'ERR_CANCELED') {
                     return false;
                 }
 
