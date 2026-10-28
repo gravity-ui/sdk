@@ -1,9 +1,17 @@
-import AxiosWrapper, {type AxiosWrapperOptions} from '@gravity-ui/axios-wrapper';
+import AxiosWrapperModule, {type AxiosWrapperOptions} from '@gravity-ui/axios-wrapper';
 import axiosRetry from 'axios-retry';
 
 import type {GatewayError} from '../models/common';
 
 import {parseError} from './common';
+
+// ponytail: axios-wrapper has no "exports", so native Node ESM receives its CJS module object
+// instead of the class. Drop when axios-wrapper ships a proper ESM entry
+type AxiosWrapperClass = typeof AxiosWrapperModule extends {default: infer T}
+    ? T
+    : typeof AxiosWrapperModule;
+const AxiosWrapper: AxiosWrapperClass =
+    (AxiosWrapperModule as unknown as {default?: AxiosWrapperClass}).default ?? AxiosWrapperModule;
 
 // Symbols are not preserved in the Axios config
 const csrfRetryKey = '__ CSRF retry';
