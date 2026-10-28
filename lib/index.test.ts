@@ -308,6 +308,24 @@ describe('sdk', () => {
             expect.hasAssertions();
         },
     );
+
+    testIf(typeof AbortController !== 'undefined')(
+        'action cancelation: no retries for cancelled requests',
+        async () => {
+            const sdk = sdkFactory<typeof baseSchema>();
+            const abortController = new AbortController();
+            abortController.abort();
+
+            const start = Date.now();
+            const error = await sdk.rootService
+                .getRoot(undefined, {signal: abortController.signal, retries: 3})
+                .catch((err) => err);
+
+            expect(sdk.isCancel(error)).toBe(true);
+            // retries use exponential delay, so three of them take more than 700ms
+            expect(Date.now() - start).toBeLessThan(500);
+        },
+    );
 });
 
 describe('csrf retry', () => {

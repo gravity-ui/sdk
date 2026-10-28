@@ -177,7 +177,7 @@ export default class Api extends AxiosWrapper {
             retries: 0,
             retryDelay: axiosRetry.exponentialDelay,
             retryCondition: (error) => {
-                if (!error.config) {
+                if (!error.config || error.code === 'ERR_CANCELED') {
                     return false;
                 }
 
