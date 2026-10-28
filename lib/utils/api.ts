@@ -7,6 +7,7 @@ import {parseError} from './common';
 
 // Symbols are not preserved in the Axios config
 const csrfRetryKey = '__ CSRF retry';
+export const scopeServicePathKey = '__ SDK scope/service path';
 
 const urlRegexp = /\/(?<api>\w+)\/(?<scope>\w+)\/(?<service>\w+)\/(?<action>\w+)/i;
 
@@ -35,7 +36,7 @@ export function getScopeServicePath(url: string): string {
 }
 
 type InterceptorsChainParams = {
-    url?: string;
+    config?: {url?: string; [scopeServicePathKey]?: string};
     axiosInterceptors?: ServicesWithAxiosInterceptors;
     queryData: any;
     success: boolean;
@@ -45,7 +46,7 @@ type InterceptorsChainParams = {
 };
 
 export function makeInterceptorsChain({
-    url,
+    config,
     axiosInterceptors,
     queryData,
     success,
@@ -53,11 +54,12 @@ export function makeInterceptorsChain({
 }: InterceptorsChainParams): Promise<any> {
     let result: Promise<any> = success ? Promise.resolve(queryData) : Promise.reject(queryData);
 
-    if (!url) {
+    // Base sdk calls with an arbitrary url have no path key, so fall back to parsing the url
+    const path = config?.[scopeServicePathKey] ?? (config?.url && getScopeServicePath(config.url));
+
+    if (!path) {
         return result;
     }
-
-    const path = getScopeServicePath(url);
 
     for (const interceptors of axiosInterceptors?.[path] || []) {
         const interceptor = interceptorSelector(interceptors);
@@ -81,7 +83,7 @@ export default class Api extends AxiosWrapper {
 
         const requestSuccess = (config: any) => {
             return makeInterceptorsChain({
-                url: config?.url,
+                config,
                 axiosInterceptors,
                 queryData: config,
                 success: true,
@@ -91,7 +93,7 @@ export default class Api extends AxiosWrapper {
 
         const requestError = (error: any) => {
             return makeInterceptorsChain({
-                url: error?.config?.url,
+                config: error?.config,
                 axiosInterceptors,
                 queryData: error,
                 success: false,
@@ -101,7 +103,7 @@ export default class Api extends AxiosWrapper {
 
         const responseSuccess = (data: any) => {
             return makeInterceptorsChain({
-                url: data?.config?.url,
+                config: data?.config,
                 axiosInterceptors,
                 queryData: data,
                 success: true,
@@ -111,7 +113,7 @@ export default class Api extends AxiosWrapper {
 
         const responseError = (error: any) => {
             let result: Promise<any> = makeInterceptorsChain({
-                url: error?.config?.url,
+                config: error?.config,
                 axiosInterceptors,
                 queryData: error,
                 success: false,

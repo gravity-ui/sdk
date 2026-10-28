@@ -8,7 +8,7 @@ import type {AxiosRequestConfig} from 'axios';
 
 import {CancellablePromise} from './CancellablePromise';
 import {Lang} from './constants';
-import Api, {createScopeServicePath} from './utils/api';
+import Api, {createScopeServicePath, scopeServicePathKey} from './utils/api';
 import type {AxiosInterceptors} from './utils/api';
 
 export type {AxiosInterceptors} from './utils/api';
@@ -70,7 +70,7 @@ const DEFAULT_METHOD = 'POST';
 function getRequestOptions(options?: SdkActionOptions, axiosConfig?: AxiosRequestConfig) {
     const requestOptions = {
         concurrentId: generateConcurrentId(),
-        requestConfig: {},
+        requestConfig: {} as AxiosRequestConfig & Record<string, unknown>,
     };
 
     if (axiosConfig) {
@@ -133,6 +133,7 @@ function createSdkAction<TRequestData, TResponseData>(
 
         const actionURL = `${endpoint}/${scope}/${service}/${action}`;
         const requestOptions = getRequestOptions(options);
+        requestOptions.requestConfig[scopeServicePathKey] = createScopeServicePath(service, scope);
 
         return new CancellablePromise(
             api.request<TResponseData>({

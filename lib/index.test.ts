@@ -385,3 +385,74 @@ describe('csrf retry', () => {
         scope.done();
     });
 });
+
+describe('axios interceptors', () => {
+    beforeEach(() => {
+        if (!nock.isActive()) {
+            nock.activate();
+        }
+    });
+
+    afterEach(() => {
+        nock.cleanAll();
+        nock.restore();
+    });
+
+    const createInterceptors = (calls: string[]) => ({
+        requestInterceptorSuccess: async (config: any) => {
+            calls.push(`request ${config.url}`);
+            return config;
+        },
+        responseInterceptorSuccess: async (response: any) => {
+            calls.push(`response ${response.config.url}`);
+            return response;
+        },
+    });
+
+    test.each([
+        ['default endpoint', '/api'],
+        ['nested endpoint', '/gateway/api'],
+        ['absolute endpoint', 'http://localhost/api'],
+    ])('applied with %s', async (_name, endpoint) => {
+        const calls: string[] = [];
+        const url = `${endpoint}/tool/toolService/getTool`;
+        const scope = nock('http://localhost')
+            .post(url.replace('http://localhost', ''))
+            .reply(200, 'test');
+        const sdk = sdkFactory<typeof baseSchema>({
+            endpoint,
+            axiosInterceptors: [
+                {scope: 'tool', service: 'toolService', interceptors: createInterceptors(calls)},
+                {service: 'toolService', interceptors: createInterceptors(calls)},
+            ],
+        });
+
+        expect(await sdk.tool.toolService.getTool()).toBe('test');
+        expect(calls).toEqual([`request ${url}`, `response ${url}`]);
+        scope.done();
+    });
+
+    test('applied to root services with dashes in names', async () => {
+        const calls: string[] = [];
+        const scope = nock('http://localhost').post('/api/root/my-service/my-action').reply(200);
+        const sdk = sdkFactory<any>({
+            axiosInterceptors: [{service: 'my-service', interceptors: createInterceptors(calls)}],
+        });
+
+        await sdk['my-service']['my-action']();
+        expect(calls).toHaveLength(2);
+        scope.done();
+    });
+
+    test('applied to base sdk calls by url', async () => {
+        const calls: string[] = [];
+        const scope = nock('http://localhost').post('/api/root/rootService/getRoot').reply(200);
+        const sdk = sdkFactory<typeof baseSchema>({
+            axiosInterceptors: [{service: 'rootService', interceptors: createInterceptors(calls)}],
+        });
+
+        await sdk({url: '/api/root/rootService/getRoot'});
+        expect(calls).toHaveLength(2);
+        scope.done();
+    });
+});
