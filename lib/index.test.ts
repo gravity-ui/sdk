@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, {type AxiosRequestConfig} from 'axios';
 import nock from 'nock';
 
 import {GatewayError} from './models/common';
@@ -192,6 +192,23 @@ describe('sdk', () => {
         expect(await req).toBe('test');
 
         scope.done();
+    });
+
+    test('retries option overrides axios config', async () => {
+        let calls = 0;
+        nock('http://localhost')
+            .post('/api/root/rootService/getRoot')
+            .times(3)
+            .reply(() => {
+                calls++;
+                return [503];
+            });
+        const sdk = sdkFactory<typeof baseSchema>({
+            axiosConfig: {'axios-retry': {retries: 2}} as AxiosRequestConfig,
+        });
+
+        await expect(sdk.rootService.getRoot(undefined, {retries: 0})).rejects.toBeDefined();
+        expect(calls).toBe(1);
     });
 
     test('errors calls', async () => {

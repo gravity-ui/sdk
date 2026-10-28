@@ -88,7 +88,7 @@ function getRequestOptions(options?: SdkActionOptions, axiosConfig?: AxiosReques
             Object.assign(requestOptions, {collectRequest: options.collectRequest});
         }
 
-        if (Object.prototype.hasOwnProperty.call(options, 'retries') && options.retries) {
+        if (options.retries !== undefined) {
             Object.assign(requestOptions, {
                 requestConfig: {
                     ...requestOptions.requestConfig,
