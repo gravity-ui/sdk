@@ -5,8 +5,7 @@ import type {GatewayError} from '../models/common';
 
 import {parseError} from './common';
 
-// ponytail: axios-wrapper has no "exports", so native Node ESM receives its CJS module object
-// instead of the class. Drop when axios-wrapper ships a proper ESM entry
+// axios-wrapper has no "exports": native Node ESM gets its CJS module object instead of the class
 type AxiosWrapperClass = typeof AxiosWrapperModule extends {default: infer T}
     ? T
     : typeof AxiosWrapperModule;
@@ -62,7 +61,6 @@ export function makeInterceptorsChain({
 }: InterceptorsChainParams): Promise<any> {
     let result: Promise<any> = success ? Promise.resolve(queryData) : Promise.reject(queryData);
 
-    // Base sdk calls with an arbitrary url have no path key, so fall back to parsing the url
     const path = config?.[scopeServicePathKey] ?? (config?.url && getScopeServicePath(config.url));
 
     if (!path) {
@@ -141,8 +139,8 @@ export default class Api extends AxiosWrapper {
 
                         if (newToken) {
                             this.setCSRFToken(newToken);
-                            // config.headers already holds the stale token and overrides the defaults.
-                            // Don't construct AxiosHeaders here: the SDK and axios-wrapper may load different axios instances
+                            // Retry headers override defaults: replace the stale token here.
+                            // Don't construct AxiosHeaders: SDK and axios-wrapper may load different axios instances
                             if (typeof config.headers?.set === 'function') {
                                 config.headers.set(this.csrfHeaderName, newToken);
                             } else {

@@ -1,5 +1,3 @@
-// Checks the built package the way consumers load it: CJS require, native ESM import
-// and a CSRF retry through the ESM entry (axios-wrapper is loaded as CJS there)
 import assert from 'node:assert/strict';
 import {createServer} from 'node:http';
 import {createRequire} from 'node:module';
@@ -29,6 +27,7 @@ const server = createServer((req, res) => {
 await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
 
 try {
+    // Only check of the ESM entry with the CJS axios inside axios-wrapper, jest runs everything as CJS
     const sdk = esm.default({
         endpoint: `http://127.0.0.1:${server.address().port}/api`,
         csrfToken: 'old',

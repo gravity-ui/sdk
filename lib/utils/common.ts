@@ -1,7 +1,6 @@
 import {ErrorCode} from '../constants';
 import type {GatewayError} from '../models/common';
 
-// Like lodash get defaults: only undefined is replaced, null is kept
 function withDefault<T>(value: T | undefined, defaultValue: T) {
     return value === undefined ? defaultValue : value;
 }
