@@ -183,6 +183,17 @@ describe('sdk', () => {
         scope.done();
     });
 
+    test('external calls keep axios config without options', async () => {
+        const scope = nock('http://localhost', {reqheaders: {'x-custom': 'value'}});
+        const sdk = sdkFactory<typeof baseSchema>();
+
+        const req = sdk({url: '/custom', method: 'GET', headers: {'x-custom': 'value'}});
+        scope.get('/custom').reply(200, 'test');
+        expect(await req).toBe('test');
+
+        scope.done();
+    });
+
     test('errors calls', async () => {
         const scope = nock('http://localhost');
         const sdk = sdkFactory<typeof baseSchema>();

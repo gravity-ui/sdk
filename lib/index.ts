@@ -73,13 +73,13 @@ function getRequestOptions(options?: SdkActionOptions, axiosConfig?: AxiosReques
         requestConfig: {},
     };
 
-    if (options) {
-        if (axiosConfig) {
-            Object.assign(requestOptions, {
-                requestConfig: axiosConfig,
-            });
-        }
+    if (axiosConfig) {
+        Object.assign(requestOptions, {
+            requestConfig: axiosConfig,
+        });
+    }
 
+    if (options) {
         if (Object.prototype.hasOwnProperty.call(options, 'concurrentId')) {
             Object.assign(requestOptions, {concurrentId: options.concurrentId});
         }
