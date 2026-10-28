@@ -10,6 +10,8 @@ const esm = await import('@gravity-ui/sdk');
 
 assert.equal(typeof cjs.default, 'function');
 assert.equal(typeof esm.default, 'function');
+assert.equal(cjs.Lang.Ru, 'ru');
+assert.equal(esm.Lang.Ru, 'ru');
 
 const requests = [];
 const server = createServer((req, res) => {

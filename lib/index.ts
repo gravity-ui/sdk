@@ -15,7 +15,7 @@ export type {AxiosInterceptors} from './utils/api';
 
 export {isNeedResetError} from './utils/common';
 
-export {ErrorCode} from './constants';
+export {ErrorCode, Lang} from './constants';
 
 export interface SdkActionOptions {
     concurrentId?: string;
@@ -249,7 +249,7 @@ export default function sdkFactory<TSchema extends SchemasByScope>(config?: SdkC
             }
         },
 
-        setLang(lang: Lang) {
+        setLang(lang: Lang | `${Lang}`) {
             if (lang) {
                 const languageHeader = {
                     name: 'accept-language',
