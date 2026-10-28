@@ -127,12 +127,28 @@ export default class Api extends AxiosWrapper {
                             this.csrfHeaderName || 'x-csrf-token'
                         ).toLowerCase();
 
-                        if (error.response.headers[csrfHeaderName]) {
-                            this.setCSRFToken(error.response.headers[csrfHeaderName]);
+                        const newToken = error.response.headers[csrfHeaderName];
+
+                        if (newToken) {
+                            this.setCSRFToken(newToken);
+                            // config.headers already holds the stale token and overrides the defaults.
+                            // Don't construct AxiosHeaders here: the SDK and axios-wrapper may load different axios instances
+                            if (typeof config.headers?.set === 'function') {
+                                config.headers.set(this.csrfHeaderName, newToken);
+                            } else {
+                                config.headers = Object.fromEntries(
+                                    Object.entries(config.headers ?? {}).filter(
+                                        ([name]) => name.toLowerCase() !== csrfHeaderName,
+                                    ),
+                                );
+                                config.headers[this.csrfHeaderName] = newToken;
+                            }
                         }
 
                         return this._axios({
                             ...config,
+                            // data is already serialized by the first attempt
+                            transformRequest: [(data: unknown) => data],
                             [csrfRetryKey]: true,
                         });
                     }

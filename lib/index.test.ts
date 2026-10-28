@@ -298,3 +298,79 @@ describe('sdk', () => {
         },
     );
 });
+
+describe('csrf retry', () => {
+    beforeEach(() => {
+        if (!nock.isActive()) {
+            nock.activate();
+        }
+    });
+
+    afterEach(() => {
+        nock.cleanAll();
+        nock.restore();
+    });
+
+    const replyWithTokenCheck = (sent: {token: unknown; body: unknown}[]) =>
+        function (this: nock.ReplyFnContext, _uri: string, body: nock.Body) {
+            const token = this.req.headers['x-csrf-token'];
+            sent.push({token, body});
+            return token === 'new'
+                ? ([200, 'ok'] as const)
+                : ([419, {}, {'x-csrf-token': 'new'}] as const);
+        };
+
+    test('retries once with the token from the 419 response', async () => {
+        const sent: {token: unknown; body: unknown}[] = [];
+        const scope = nock('http://localhost')
+            .post('/api/root/rootService/getRoot')
+            .times(2)
+            .reply(replyWithTokenCheck(sent));
+        const sdk = sdkFactory<typeof baseSchema>({csrfToken: 'old', updateCsrfEnabled: true});
+
+        expect(await sdk.rootService.getRoot({a: 1})).toBe('ok');
+        expect(sent).toEqual([
+            {token: 'old', body: {a: 1}},
+            {token: 'new', body: {a: 1}},
+        ]);
+        scope.done();
+    });
+
+    test('does not retry twice', async () => {
+        const scope = nock('http://localhost')
+            .post('/api/root/rootService/getRoot')
+            .times(2)
+            .reply(419, {}, {'x-csrf-token': 'old'});
+        const sdk = sdkFactory<typeof baseSchema>({csrfToken: 'old', updateCsrfEnabled: true});
+
+        await expect(sdk.rootService.getRoot()).rejects.toBeDefined();
+        scope.done();
+    });
+
+    test('updates plain object headers', async () => {
+        const sent: {token: unknown; body: unknown}[] = [];
+        const scope = nock('http://localhost')
+            .post('/api/root/rootService/getRoot')
+            .times(2)
+            .reply(replyWithTokenCheck(sent));
+        const sdk = sdkFactory<typeof baseSchema>({
+            csrfToken: 'old',
+            updateCsrfEnabled: true,
+            axiosInterceptors: [
+                {
+                    service: 'rootService',
+                    interceptors: {
+                        responseInterceptorError: async (error) => {
+                            error.config.headers = {...error.config.headers.toJSON()};
+                            throw error;
+                        },
+                    },
+                },
+            ],
+        });
+
+        expect(await sdk.rootService.getRoot()).toBe('ok');
+        expect(sent.map(({token}) => token)).toEqual(['old', 'new']);
+        scope.done();
+    });
+});
