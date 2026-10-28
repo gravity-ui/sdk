@@ -1,31 +1,35 @@
-import _get from 'lodash/get';
-
 import {ErrorCode} from '../constants';
 import type {GatewayError} from '../models/common';
 
+// Like lodash get defaults: only undefined is replaced, null is kept
+function withDefault<T>(value: T | undefined, defaultValue: T) {
+    return value === undefined ? defaultValue : value;
+}
+
 export function parseError(errorResponse: unknown) {
     let parsedError = {} as GatewayError;
-    const errorData = _get(errorResponse, 'data');
+    const response = errorResponse as any;
+    const errorData = response?.data;
 
     if (errorData) {
         // Properly handle nginx errors
         if (typeof errorData === 'string') {
             parsedError = {
-                status: _get(errorResponse, 'status', 500),
+                status: withDefault(response.status, 500),
                 code: ErrorCode.SDKRequestError,
                 message: 'SDK request error',
                 details: {
-                    title: _get(errorResponse, 'status'),
-                    description: _get(errorResponse, 'statusText'),
+                    title: response.status,
+                    description: response.statusText,
                 },
             };
         } else {
             parsedError = {
-                status: _get(errorData, 'status', 500),
-                code: _get(errorData, 'code', ErrorCode.SDKRequestError),
-                message: _get(errorData, 'message', 'SDK request error'),
-                details: _get(errorData, 'details'),
-                debug: _get(errorData, 'debug'),
+                status: withDefault(errorData.status, 500),
+                code: withDefault(errorData.code, ErrorCode.SDKRequestError),
+                message: withDefault(errorData.message, 'SDK request error'),
+                details: errorData.details,
+                debug: errorData.debug,
             };
         }
     } else {
@@ -43,7 +47,7 @@ export function parseError(errorResponse: unknown) {
 export function isNeedResetError(
     errorResponse: unknown,
 ): errorResponse is {data: {code: ErrorCode.AccountChanged | ErrorCode.SessionExpired}} {
-    const code = _get(errorResponse, 'data.code');
+    const code = (errorResponse as any)?.data?.code;
 
     return code === ErrorCode.AccountChanged || code === ErrorCode.SessionExpired;
 }

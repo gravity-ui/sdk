@@ -65,7 +65,6 @@
     "@swc/jest": "^0.2.38",
     "@types/express": "^5.0.6",
     "@types/jest": "^29.5.2",
-    "@types/lodash": "^4.14.178",
     "eslint": "^8.46.0",
     "eslint-plugin-import": "^2.28.0",
     "gulp": "^5.0.0",
