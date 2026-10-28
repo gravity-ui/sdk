@@ -36,6 +36,7 @@
     "prepare": "husky install",
     "prepublishOnly": "npm run build",
     "test": "jest",
+    "test:package": "node test/smoke.mjs && tsc -p test/nodenext",
     "typecheck": "tsc --noEmit"
   },
   "nano-staged": {
@@ -62,6 +63,7 @@
     "@gravity-ui/tsconfig": "^1.0.0",
     "@swc/core": "^1.11.24",
     "@swc/jest": "^0.2.38",
+    "@types/express": "^5.0.6",
     "@types/jest": "^29.5.2",
     "@types/lodash": "^4.14.178",
     "@types/uuid": "^8.3.0",

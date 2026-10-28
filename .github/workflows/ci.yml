@@ -44,4 +44,8 @@ jobs:
       run: npm ci
     - name: Unit Tests
       run: npm run test
+    - name: Build
+      run: npm run build
+    - name: Package Tests
+      run: npm run test:package
 
