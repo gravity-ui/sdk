@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.1](https://github.com/gravity-ui/sdk/compare/v2.1.0...v2.1.1) (2026-11-02)
+
+
+### Bug Fixes
+
+* correct CSRF retry, interceptors, cancellation and package entry points ([#33](https://github.com/gravity-ui/sdk/issues/33)) ([299bc1a](https://github.com/gravity-ui/sdk/commit/299bc1af1be4b97fb3b6769d2e4b7f33b68cf747))
+
 ## [2.1.0](https://github.com/gravity-ui/sdk/compare/v2.0.0...v2.1.0) (2026-04-24)
 
 
