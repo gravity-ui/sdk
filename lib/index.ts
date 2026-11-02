@@ -8,14 +8,14 @@ import type {AxiosRequestConfig} from 'axios';
 
 import {CancellablePromise} from './CancellablePromise';
 import {Lang} from './constants';
-import Api, {createScopeServicePath} from './utils/api';
+import Api, {createScopeServicePath, scopeServicePathKey} from './utils/api';
 import type {AxiosInterceptors} from './utils/api';
 
 export type {AxiosInterceptors} from './utils/api';
 
 export {isNeedResetError} from './utils/common';
 
-export {ErrorCode} from './constants';
+export {ErrorCode, Lang} from './constants';
 
 export interface SdkActionOptions {
     concurrentId?: string;
@@ -70,16 +70,16 @@ const DEFAULT_METHOD = 'POST';
 function getRequestOptions(options?: SdkActionOptions, axiosConfig?: AxiosRequestConfig) {
     const requestOptions = {
         concurrentId: generateConcurrentId(),
-        requestConfig: {},
+        requestConfig: {} as AxiosRequestConfig & Record<string, unknown>,
     };
 
-    if (options) {
-        if (axiosConfig) {
-            Object.assign(requestOptions, {
-                requestConfig: axiosConfig,
-            });
-        }
+    if (axiosConfig) {
+        Object.assign(requestOptions, {
+            requestConfig: axiosConfig,
+        });
+    }
 
+    if (options) {
         if (Object.prototype.hasOwnProperty.call(options, 'concurrentId')) {
             Object.assign(requestOptions, {concurrentId: options.concurrentId});
         }
@@ -88,7 +88,7 @@ function getRequestOptions(options?: SdkActionOptions, axiosConfig?: AxiosReques
             Object.assign(requestOptions, {collectRequest: options.collectRequest});
         }
 
-        if (Object.prototype.hasOwnProperty.call(options, 'retries') && options.retries) {
+        if (options.retries !== undefined) {
             Object.assign(requestOptions, {
                 requestConfig: {
                     ...requestOptions.requestConfig,
@@ -133,6 +133,7 @@ function createSdkAction<TRequestData, TResponseData>(
 
         const actionURL = `${endpoint}/${scope}/${service}/${action}`;
         const requestOptions = getRequestOptions(options);
+        requestOptions.requestConfig[scopeServicePathKey] = createScopeServicePath(service, scope);
 
         return new CancellablePromise(
             api.request<TResponseData>({
@@ -248,7 +249,7 @@ export default function sdkFactory<TSchema extends SchemasByScope>(config?: SdkC
             }
         },
 
-        setLang(lang: Lang) {
+        setLang(lang: Lang | `${Lang}`) {
             if (lang) {
                 const languageHeader = {
                     name: 'accept-language',

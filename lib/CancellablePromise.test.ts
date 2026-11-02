@@ -15,6 +15,18 @@ describe('all', function () {
         expect(promise1.cancel).toHaveBeenCalled();
         expect(promise2.cancel).toHaveBeenCalled();
     });
+    test.each(['all', 'allSettled', 'race'] as const)(
+        'should cancel only cancellable values in `%s`',
+        (method) => {
+            const promise = new CancellablePromise(new Promise(() => {}));
+            jest.spyOn(promise, 'cancel');
+
+            const result = CancellablePromise[method]([promise, Promise.resolve(1), 2, null]);
+
+            expect(() => result.cancel()).not.toThrow();
+            expect(promise.cancel).toHaveBeenCalled();
+        },
+    );
     test('should reject with an error when the `all` method is used with some rejected promises', async () => {
         expect.assertions(1);
 

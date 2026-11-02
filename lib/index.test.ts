@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, {type AxiosRequestConfig} from 'axios';
 import nock from 'nock';
 
 import {GatewayError} from './models/common';
@@ -183,6 +183,34 @@ describe('sdk', () => {
         scope.done();
     });
 
+    test('external calls keep axios config without options', async () => {
+        const scope = nock('http://localhost', {reqheaders: {'x-custom': 'value'}});
+        const sdk = sdkFactory<typeof baseSchema>();
+
+        const req = sdk({url: '/custom', method: 'GET', headers: {'x-custom': 'value'}});
+        scope.get('/custom').reply(200, 'test');
+        expect(await req).toBe('test');
+
+        scope.done();
+    });
+
+    test('retries option overrides axios config', async () => {
+        let calls = 0;
+        nock('http://localhost')
+            .post('/api/root/rootService/getRoot')
+            .times(3)
+            .reply(() => {
+                calls++;
+                return [503];
+            });
+        const sdk = sdkFactory<typeof baseSchema>({
+            axiosConfig: {'axios-retry': {retries: 2}} as AxiosRequestConfig,
+        });
+
+        await expect(sdk.rootService.getRoot(undefined, {retries: 0})).rejects.toBeDefined();
+        expect(calls).toBe(1);
+    });
+
     test('errors calls', async () => {
         const scope = nock('http://localhost');
         const sdk = sdkFactory<typeof baseSchema>();
@@ -297,4 +325,169 @@ describe('sdk', () => {
             expect.hasAssertions();
         },
     );
+
+    testIf(typeof AbortController !== 'undefined')(
+        'action cancelation: no retries for cancelled requests',
+        async () => {
+            const sdk = sdkFactory<typeof baseSchema>();
+            const abortController = new AbortController();
+            abortController.abort();
+
+            const start = Date.now();
+            const error = await sdk.rootService
+                .getRoot(undefined, {signal: abortController.signal, retries: 3})
+                .catch((err) => err);
+
+            expect(sdk.isCancel(error)).toBe(true);
+            // retries use exponential delay, so three of them take more than 700ms
+            expect(Date.now() - start).toBeLessThan(500);
+        },
+    );
+});
+
+describe('csrf retry', () => {
+    beforeEach(() => {
+        if (!nock.isActive()) {
+            nock.activate();
+        }
+    });
+
+    afterEach(() => {
+        nock.cleanAll();
+        nock.restore();
+    });
+
+    const replyWithTokenCheck = (sent: {token: unknown; body: unknown}[]) =>
+        function (this: nock.ReplyFnContext, _uri: string, body: nock.Body) {
+            const token = this.req.headers['x-csrf-token'];
+            sent.push({token, body});
+            return token === 'new'
+                ? ([200, 'ok'] as const)
+                : ([419, {}, {'x-csrf-token': 'new'}] as const);
+        };
+
+    test('retries once with the token from the 419 response', async () => {
+        const sent: {token: unknown; body: unknown}[] = [];
+        const scope = nock('http://localhost')
+            .post('/api/root/rootService/getRoot')
+            .times(2)
+            .reply(replyWithTokenCheck(sent));
+        const sdk = sdkFactory<typeof baseSchema>({csrfToken: 'old', updateCsrfEnabled: true});
+
+        expect(await sdk.rootService.getRoot({a: 1})).toBe('ok');
+        expect(sent).toEqual([
+            {token: 'old', body: {a: 1}},
+            {token: 'new', body: {a: 1}},
+        ]);
+        scope.done();
+    });
+
+    test('does not retry twice', async () => {
+        const scope = nock('http://localhost')
+            .post('/api/root/rootService/getRoot')
+            .times(2)
+            .reply(419, {}, {'x-csrf-token': 'old'});
+        const sdk = sdkFactory<typeof baseSchema>({csrfToken: 'old', updateCsrfEnabled: true});
+
+        await expect(sdk.rootService.getRoot()).rejects.toBeDefined();
+        scope.done();
+    });
+
+    test('updates plain object headers', async () => {
+        const sent: {token: unknown; body: unknown}[] = [];
+        const scope = nock('http://localhost')
+            .post('/api/root/rootService/getRoot')
+            .times(2)
+            .reply(replyWithTokenCheck(sent));
+        const sdk = sdkFactory<typeof baseSchema>({
+            csrfToken: 'old',
+            updateCsrfEnabled: true,
+            axiosInterceptors: [
+                {
+                    service: 'rootService',
+                    interceptors: {
+                        responseInterceptorError: async (error) => {
+                            error.config.headers = {...error.config.headers.toJSON()};
+                            throw error;
+                        },
+                    },
+                },
+            ],
+        });
+
+        expect(await sdk.rootService.getRoot()).toBe('ok');
+        expect(sent.map(({token}) => token)).toEqual(['old', 'new']);
+        scope.done();
+    });
+});
+
+describe('axios interceptors', () => {
+    beforeEach(() => {
+        if (!nock.isActive()) {
+            nock.activate();
+        }
+    });
+
+    afterEach(() => {
+        nock.cleanAll();
+        nock.restore();
+    });
+
+    const createInterceptors = (calls: string[]) => ({
+        requestInterceptorSuccess: async (config: any) => {
+            calls.push(`request ${config.url}`);
+            return config;
+        },
+        responseInterceptorSuccess: async (response: any) => {
+            calls.push(`response ${response.config.url}`);
+            return response;
+        },
+    });
+
+    test.each([
+        ['default endpoint', '/api'],
+        ['nested endpoint', '/gateway/api'],
+        ['absolute endpoint', 'http://localhost/api'],
+    ])('applied with %s', async (_name, endpoint) => {
+        const calls: string[] = [];
+        const url = `${endpoint}/tool/toolService/getTool`;
+        const scope = nock('http://localhost')
+            .post(url.replace('http://localhost', ''))
+            .reply(200, 'test');
+        const sdk = sdkFactory<typeof baseSchema>({
+            endpoint,
+            axiosInterceptors: [
+                {scope: 'tool', service: 'toolService', interceptors: createInterceptors(calls)},
+                {service: 'toolService', interceptors: createInterceptors(calls)},
+            ],
+        });
+
+        expect(await sdk.tool.toolService.getTool()).toBe('test');
+        expect(calls).toEqual([`request ${url}`, `response ${url}`]);
+        scope.done();
+    });
+
+    test('applied to root services with dashes in names', async () => {
+        const calls: string[] = [];
+        const scope = nock('http://localhost').post('/api/root/my-service/my-action').reply(200);
+        const sdk = sdkFactory<any>({
+            axiosInterceptors: [{service: 'my-service', interceptors: createInterceptors(calls)}],
+        });
+
+        await sdk['my-service']['my-action']();
+        expect(calls).toHaveLength(2);
+        scope.done();
+    });
+
+    test('applied to base sdk calls by url', async () => {
+        const calls: string[] = [];
+        const scope = nock('http://localhost').post('/api/root/rootService/getRoot').reply(200);
+        const sdk = sdkFactory<typeof baseSchema>({
+            axiosInterceptors: [{service: 'rootService', interceptors: createInterceptors(calls)}],
+        });
+
+        await sdk({url: '/api/root/rootService/getRoot'});
+        expect(calls).toHaveLength(2);
+        scope.done();
+    });
 });

@@ -1,46 +1,36 @@
 export type Awaited<T> = T extends PromiseLike<infer V> ? V : never;
 
+function cancelAll(values: readonly unknown[]) {
+    for (const value of values) {
+        if (typeof (value as Partial<CancellablePromise>)?.cancel === 'function') {
+            (value as CancellablePromise).cancel();
+        }
+    }
+}
+
 export class CancellablePromise<T = unknown> implements Promise<T> {
     static all<Values extends readonly unknown[] | []>(values: Values) {
-        function cancel() {
-            for (const promise of values as CancellablePromise[]) {
-                promise.cancel();
-            }
-        }
-
         return new CancellablePromise(
             Promise.all(values) as unknown as Promise<{
                 -readonly [P in keyof Values]: Awaited<Values[P]>;
             }>,
-            cancel,
+            () => cancelAll(values),
         );
     }
 
     static allSettled<Values extends readonly unknown[] | []>(values: Values) {
-        function cancel() {
-            for (const promise of values as CancellablePromise[]) {
-                promise.cancel();
-            }
-        }
-
         return new CancellablePromise(
             Promise.allSettled(values) as unknown as Promise<{
                 -readonly [P in keyof Values]: PromiseSettledResult<Awaited<Values[P]>>;
             }>,
-            cancel,
+            () => cancelAll(values),
         );
     }
 
     static race<Values extends readonly unknown[] | []>(values: Values) {
-        function cancel() {
-            for (const promise of values as CancellablePromise[]) {
-                promise.cancel();
-            }
-        }
-
         return new CancellablePromise(
             Promise.race(values) as Promise<Awaited<Values[number]>>,
-            cancel,
+            () => cancelAll(values),
         );
     }
 
