@@ -1,17 +1,16 @@
-import AxiosWrapperModule, {type AxiosWrapperOptions} from '@gravity-ui/axios-wrapper';
-import {CanceledError} from 'axios';
+import axios, {
+    type AxiosError,
+    type AxiosInstance,
+    type AxiosRequestConfig,
+    type CancelTokenSource,
+    CanceledError,
+    type HeadersDefaults,
+} from 'axios';
 import axiosRetry from 'axios-retry';
 
 import type {GatewayError} from '../models/common';
 
 import {parseError} from './common';
-
-// axios-wrapper has no "exports": native Node ESM gets its CJS module object instead of the class
-type AxiosWrapperClass = typeof AxiosWrapperModule extends {default: infer T}
-    ? T
-    : typeof AxiosWrapperModule;
-const AxiosWrapper: AxiosWrapperClass =
-    (AxiosWrapperModule as unknown as {default?: AxiosWrapperClass}).default ?? AxiosWrapperModule;
 
 // Symbols are not preserved in the Axios config
 const csrfRetryKey = '__ CSRF retry';
@@ -28,9 +27,26 @@ export interface AxiosInterceptors {
 
 type ServicesWithAxiosInterceptors = Record<string, AxiosInterceptors[]>;
 
-export type ApiOptions = AxiosWrapperOptions & {
+export type ApiOptions = {
+    config?: AxiosRequestConfig;
+    csrfHeaderName?: string;
     updateCsrfEnabled?: boolean;
     axiosInterceptors?: ServicesWithAxiosInterceptors;
+};
+
+type RequestParams = {
+    method: AxiosRequestConfig['method'];
+    url: string;
+    data?: unknown;
+    params?: AxiosRequestConfig['params'];
+    retries?: number;
+    options?: {
+        concurrentId?: string;
+        timeout?: number;
+        headers?: AxiosRequestConfig['headers'];
+        requestConfig?: AxiosRequestConfig;
+        onDownloadProgress?: AxiosRequestConfig['onDownloadProgress'];
+    };
 };
 
 export function createScopeServicePath(service: string, scope?: string): string {
@@ -81,12 +97,27 @@ export function makeInterceptorsChain({
     return result;
 }
 
-export default class Api extends AxiosWrapper {
+export default class Api {
+    private readonly _axios: AxiosInstance;
+    private readonly requestTokens = new Map<string, CancelTokenSource>();
+    private readonly csrfHeaderName: string;
+
     constructor(
-        {updateCsrfEnabled, axiosInterceptors, ...props}: ApiOptions = {},
+        {
+            config,
+            csrfHeaderName = 'X-CSRF-Token',
+            updateCsrfEnabled,
+            axiosInterceptors,
+        }: ApiOptions = {},
         handleRequestError?: (error: unknown) => any,
     ) {
-        super(props);
+        this._axios = axios.create({
+            xsrfCookieName: '',
+            timeout: 60000,
+            withCredentials: true,
+            ...config,
+        });
+        this.csrfHeaderName = csrfHeaderName;
 
         const requestSuccess = (config: any) => {
             return makeInterceptorsChain({
@@ -159,7 +190,7 @@ export default class Api extends AxiosWrapper {
                         if (newToken) {
                             this.setCSRFToken(newToken);
                             // Retry headers override defaults: replace the stale token here.
-                            // Don't construct AxiosHeaders: SDK and axios-wrapper may load different axios instances
+                            // Callers may use AxiosHeaders from another Axios module instance.
                             if (typeof config.headers?.set === 'function') {
                                 config.headers.set(this.csrfHeaderName, newToken);
                             } else {
@@ -207,7 +238,97 @@ export default class Api extends AxiosWrapper {
         }
     }
 
-    handleRequestError<T = GatewayError>(errorResponse: unknown): Promise<T> | T {
+    setCSRFToken(token: string) {
+        for (const method of ['post', 'put', 'delete'] as const) {
+            this._axios.defaults.headers[method][this.csrfHeaderName] = token;
+        }
+    }
+
+    setDefaultHeader({name, value, methods}: {name: string; value: string; methods?: string[]}) {
+        const headers = this._axios.defaults.headers;
+
+        if (Array.isArray(methods)) {
+            for (const method of methods) {
+                const key = method.toLowerCase() as keyof HeadersDefaults;
+                if (Object.prototype.hasOwnProperty.call(headers, key)) {
+                    const methodHeaders = headers[key];
+                    if (methodHeaders) {
+                        methodHeaders[name] = value;
+                    }
+                }
+            }
+        } else {
+            headers.common[name] = value;
+        }
+    }
+
+    async request<T = unknown>(requestParams: RequestParams): Promise<T> {
+        const {method, url, data = null, params, options = {}, retries = 0} = requestParams;
+        const {concurrentId, timeout, headers, onDownloadProgress} = options;
+        const requestConfig = {...options.requestConfig};
+        let source: CancelTokenSource | undefined;
+
+        if (concurrentId) {
+            this.cancelRequest(concurrentId);
+            source = axios.CancelToken.source();
+            this.requestTokens.set(concurrentId, source);
+            requestConfig.cancelToken = source.token;
+        }
+        if (headers) {
+            requestConfig.headers = headers;
+        }
+        if (timeout !== undefined) {
+            requestConfig.timeout = timeout;
+        }
+
+        try {
+            const response = await this._axios.request<T>({
+                ...requestConfig,
+                method,
+                url,
+                data,
+                params,
+                onDownloadProgress,
+            });
+            return response.data;
+        } catch (thrown) {
+            if (axios.isCancel(thrown)) {
+                throw {isCancelled: true, error: thrown};
+            }
+
+            const error = thrown as AxiosError | undefined;
+            const errorResponse = error?.response
+                ? error.response
+                : typeof error?.toJSON === 'function'
+                ? error.toJSON()
+                : thrown;
+
+            return this.handleRequestError<T>(
+                errorResponse,
+                () => this.request<T>({...requestParams, retries: retries + 1}),
+                retries,
+                new Error(thrown instanceof Error ? thrown.message : 'Unknown error'),
+            );
+        } finally {
+            // A replaced request must not clear the token belonging to its successor.
+            if (concurrentId && this.requestTokens.get(concurrentId) === source) {
+                this.requestTokens.delete(concurrentId);
+            }
+        }
+    }
+
+    cancelRequest(id?: string) {
+        if (id) {
+            this.requestTokens.get(id)?.cancel('Concurrent request');
+        }
+    }
+
+    private handleRequestError<T = GatewayError>(
+        errorResponse: unknown,
+        _retry?: () => Promise<T>,
+        _retries?: number,
+        _error?: Error,
+    ): Promise<T> | T {
         throw parseError(errorResponse);
     }
 }
