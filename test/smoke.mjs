@@ -27,22 +27,28 @@ const server = createServer((req, res) => {
 await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
 
 try {
-    // Only check of the ESM entry with the CJS axios inside axios-wrapper, jest runs everything as CJS
-    const sdk = esm.default({
-        endpoint: `http://127.0.0.1:${server.address().port}/api`,
-        csrfToken: 'old',
-        updateCsrfEnabled: true,
-    });
+    // Exercise both native entry points; Jest loads the source as CommonJS.
+    for (const factory of [cjs.default, esm.default]) {
+        requests.length = 0;
+        const sdk = factory({
+            endpoint: `http://127.0.0.1:${server.address().port}/api`,
+            csrfToken: 'old',
+            updateCsrfEnabled: true,
+        });
 
-    assert.equal(await sdk.service.action({a: 1}, {headers: {authorization: 'Bearer x'}}), 'ok');
-    assert.equal(requests.length, 2);
+        assert.equal(
+            await sdk.service.action({a: 1}, {headers: {authorization: 'Bearer x'}}),
+            'ok',
+        );
+        assert.equal(requests.length, 2);
 
-    const [first, retry] = requests;
-    assert.equal(first.headers['x-csrf-token'], 'old');
-    assert.equal(retry.headers['x-csrf-token'], 'new');
-    assert.equal(retry.headers.authorization, 'Bearer x');
-    assert.match(retry.headers['content-type'], /^application\/json/);
-    assert.equal(retry.body, '{"a":1}');
+        const [first, retry] = requests;
+        assert.equal(first.headers['x-csrf-token'], 'old');
+        assert.equal(retry.headers['x-csrf-token'], 'new');
+        assert.equal(retry.headers.authorization, 'Bearer x');
+        assert.match(retry.headers['content-type'], /^application\/json/);
+        assert.equal(retry.body, '{"a":1}');
+    }
 } finally {
     server.close();
 }
