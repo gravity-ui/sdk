@@ -2,6 +2,7 @@ import sdkFactory, {CancellablePromise, Lang} from '@gravity-ui/sdk';
 
 const sdk = sdkFactory();
 sdk.setDefaultHeader({name: 'x-test', value: 'test'});
+sdk.setDefaultHeader({name: 'x-method', value: 'test', methods: ['post']});
 sdk.setLang(Lang.En);
 sdk.setLang('ru');
 // @ts-expect-error unsupported language
