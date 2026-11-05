@@ -47,13 +47,19 @@ describe('transport contracts', () => {
             },
         });
 
-        await sdk({url: '/test', timeout: 200, headers: {'x-request': 'request'}});
+        const onDownloadProgress = jest.fn();
+        await sdk({
+            url: '/test',
+            timeout: 200,
+            headers: {'x-request': 'request'},
+            onDownloadProgress,
+        });
         await sdk(
             {url: '/test', timeout: 200, headers: {'x-request': 'request'}},
             {timeout: 0, headers: {'x-option': 'option'}},
         );
 
-        expect(adapter.mock.calls[0][0]).toMatchObject({timeout: 200});
+        expect(adapter.mock.calls[0][0]).toMatchObject({timeout: 200, onDownloadProgress});
         expect(adapter.mock.calls[0][0].headers.get('x-request')).toBe('request');
         const config = adapter.mock.calls[1][0];
         expect(config).toMatchObject({
