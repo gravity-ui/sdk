@@ -45,7 +45,6 @@ type RequestParams = {
         timeout?: number;
         headers?: AxiosRequestConfig['headers'];
         requestConfig?: AxiosRequestConfig;
-        onDownloadProgress?: AxiosRequestConfig['onDownloadProgress'];
     };
 };
 
@@ -264,7 +263,7 @@ export default class Api {
 
     async request<T = unknown>(requestParams: RequestParams): Promise<T> {
         const {method, url, data = null, params, options = {}, retries = 0} = requestParams;
-        const {concurrentId, timeout, headers, onDownloadProgress} = options;
+        const {concurrentId, timeout, headers} = options;
         const requestConfig = {...options.requestConfig};
         let source: CancelTokenSource | undefined;
 
@@ -288,7 +287,6 @@ export default class Api {
                 url,
                 data,
                 params,
-                onDownloadProgress,
             });
             return response.data;
         } catch (thrown) {
