@@ -50,7 +50,7 @@ describe('transport contracts', () => {
         await sdk({url: '/test', timeout: 200, headers: {'x-request': 'request'}});
         await sdk(
             {url: '/test', timeout: 200, headers: {'x-request': 'request'}},
-            {timeout: 0, headers: {'x-option': 'option'}, collectRequest: false},
+            {timeout: 0, headers: {'x-option': 'option'}},
         );
 
         expect(adapter.mock.calls[0][0]).toMatchObject({timeout: 200});
