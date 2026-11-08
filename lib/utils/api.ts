@@ -117,7 +117,22 @@ export default class Api extends AxiosWrapper {
             });
         };
 
-        const responseError = (error: any) => {
+        const responseError = async (error: any) => {
+            const data = error?.response?.data;
+
+            // Stream requests leave the gateway error body unread, and axios no longer aborts it
+            if (typeof data?.getReader === 'function') {
+                const body = data.pipeThrough(new TransformStream(), {
+                    signal: error.config?.signal,
+                });
+                const text = await new Response(body).text().catch(() => '');
+                try {
+                    error.response.data = JSON.parse(text);
+                } catch {
+                    error.response.data = text;
+                }
+            }
+
             let result: Promise<any> = makeInterceptorsChain({
                 config: error?.config,
                 axiosInterceptors,
