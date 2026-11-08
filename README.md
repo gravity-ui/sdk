@@ -111,7 +111,7 @@ for (let chunk = await reader.read(); !chunk.done; chunk = await reader.read()) 
 }
 ```
 
-The timeout keeps running until the stream ends, so stream requests have no timeout unless `timeout` is passed. Once the response headers arrive, `cancel()` and `concurrentId` no longer affect the request: stop the stream with `signal` or `stream.cancel()`. Gateway errors are read from the body and rejected as usual; only `signal` aborts reading an error body.
+The timeout keeps running until the stream ends, so stream requests have no timeout unless `timeout` is passed. Once the response headers arrive, `cancel()` and `concurrentId` no longer affect the request: stop the stream with `signal` or `reader.cancel()`. Gateway errors are read from the body and rejected as usual; only `signal` aborts reading an error body.
 
 ## Invoking External Methods
 
