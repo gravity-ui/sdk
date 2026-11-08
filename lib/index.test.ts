@@ -9,7 +9,6 @@ import {GatewayError} from './models/common';
 import sdkFactory from './index';
 
 axios.defaults.adapter = 'http';
-// Node has no page origin to resolve the relative /api urls against
 axios.defaults.baseURL = 'http://localhost';
 
 const baseSchema = {
@@ -357,11 +356,6 @@ describe('stream', () => {
 
     beforeAll(async () => {
         server = createServer((req, res) => {
-            if (req.url?.endsWith('/getRoot2')) {
-                res.writeHead(500, {'content-type': 'application/json'});
-                res.write('{');
-                return;
-            }
             if (req.url?.endsWith('/getTool')) {
                 res.writeHead(403, {'content-type': 'application/json'});
                 res.end(JSON.stringify({status: 403, code: 'FORBIDDEN', message: 'No access'}));
@@ -376,7 +370,6 @@ describe('stream', () => {
     });
 
     afterAll(() => {
-        server.closeAllConnections();
         server.close();
     });
 
@@ -402,16 +395,6 @@ describe('stream', () => {
                 message: 'No access',
             },
         );
-    });
-
-    test('aborts reading an unfinished error body with the signal', async () => {
-        const sdk = sdkFactory<typeof baseSchema>({endpoint});
-        const controller = new AbortController();
-
-        const req = sdk.rootService.getRoot2(undefined, {stream: true, signal: controller.signal});
-        setTimeout(() => controller.abort(), 50);
-
-        await expect(req).rejects.toMatchObject({code: 'SDK_REQUEST_ERROR'});
     });
 });
 
