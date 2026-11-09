@@ -1,4 +1,5 @@
 import AxiosWrapperModule, {type AxiosWrapperOptions} from '@gravity-ui/axios-wrapper';
+import {CanceledError} from 'axios';
 import axiosRetry from 'axios-retry';
 
 import type {GatewayError} from '../models/common';
@@ -126,6 +127,9 @@ export default class Api extends AxiosWrapper {
                     signal: error.config?.signal,
                 });
                 const text = await new Response(body).text().catch(() => '');
+                if (error.config?.signal?.aborted) {
+                    throw new CanceledError();
+                }
                 try {
                     error.response.data = JSON.parse(text);
                 } catch {
