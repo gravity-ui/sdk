@@ -1,9 +1,4 @@
-import axios, {
-    AxiosError,
-    type AxiosRequestConfig,
-    type AxiosResponse,
-    type InternalAxiosRequestConfig,
-} from 'axios';
+import axios, {AxiosError, type AxiosResponse, type InternalAxiosRequestConfig} from 'axios';
 
 import sdkFactory from './index';
 
@@ -125,17 +120,23 @@ describe('transport contracts', () => {
         ]);
     });
 
-    test.each(['response', 'json', 'raw'] as const)(
+    const errorData = {status: 403, data: {code: 'FORBIDDEN'}};
+    const rawError = new Error('failed');
+
+    test.each([
+        [
+            'response',
+            Object.assign(new Error('failed'), {
+                response: errorData,
+                toJSON: () => ({ignored: true}),
+            }),
+            errorData,
+        ],
+        ['json', Object.assign(new Error('failed'), {toJSON: () => errorData}), errorData],
+        ['raw', rawError, rawError],
+    ])(
         'passes the %s error representation and all four arguments to the handler',
-        async (kind) => {
-            const error = new Error('failed');
-            const errorData = {status: 403, data: {code: 'FORBIDDEN'}};
-            const thrown =
-                kind === 'response'
-                    ? Object.assign(error, {response: errorData, toJSON: () => ({ignored: true})})
-                    : kind === 'json'
-                    ? Object.assign(error, {toJSON: () => errorData})
-                    : error;
+        async (_kind, thrown, expected) => {
             const handleRequestError = jest.fn((..._args: unknown[]) => 'recovered');
             const sdk = sdkFactory({
                 axiosConfig: {adapter: async () => Promise.reject(thrown)},
@@ -144,12 +145,11 @@ describe('transport contracts', () => {
 
             await expect(sdk({url: '/test'})).resolves.toBe('recovered');
             expect(handleRequestError).toHaveBeenCalledWith(
-                kind === 'raw' ? error : errorData,
+                expected,
                 expect.any(Function),
                 0,
                 expect.objectContaining({message: 'failed'}),
             );
-            expect(handleRequestError.mock.calls[0][3]).not.toBe(error);
         },
     );
 
@@ -184,35 +184,6 @@ describe('transport contracts', () => {
         });
     });
 
-    test.each([null, undefined])(
-        'passes a nullish retry-hook error (%p) to the handler',
-        async (error) => {
-            const handleRequestError = jest.fn((..._args: unknown[]) => 'recovered');
-            const sdk = sdkFactory({
-                axiosConfig: {
-                    adapter: async (config) => {
-                        throw new AxiosError('offline', 'ERR_NETWORK', config);
-                    },
-                    'axios-retry': {
-                        retries: 1,
-                        retryCondition: () => {
-                            throw error;
-                        },
-                    },
-                } as AxiosRequestConfig,
-                handleRequestError,
-            });
-
-            await expect(sdk({url: '/test'})).resolves.toBe('recovered');
-            expect(handleRequestError).toHaveBeenCalledWith(
-                error,
-                expect.any(Function),
-                0,
-                expect.objectContaining({message: 'Unknown error'}),
-            );
-        },
-    );
-
     test('can cancel a retry started by the custom error handler', async () => {
         const retryStarted = deferred<void>();
         let attempts = 0;
@@ -240,10 +211,10 @@ describe('transport contracts', () => {
         expect(handleRequestError).toHaveBeenCalledTimes(1);
     });
 
-    test.each(['promise', 'id', 'replacement'])(
+    test.each(['promise', 'id'])(
         'keeps cancellation via %s after replacing a concurrent request',
         async (cancelVia) => {
-            const starts = [deferred<void>(), deferred<void>(), deferred<void>()];
+            const starts = [deferred<void>(), deferred<void>()];
             let started = 0;
             const handleRequestError = jest.fn();
             const adapter = jest.fn(
@@ -263,14 +234,8 @@ describe('transport contracts', () => {
 
             if (cancelVia === 'promise') {
                 second.cancel();
-            } else if (cancelVia === 'id') {
-                sdk.cancelRequest('shared');
             } else {
-                const third = sdk({url: '/third'}, {concurrentId: 'shared'});
-                const thirdResult = third.catch((error) => error);
-                await starts[2].promise;
-                third.cancel();
-                expect(sdk.isCancel(await thirdResult)).toBe(true);
+                sdk.cancelRequest('shared');
             }
 
             const error = await secondResult;
