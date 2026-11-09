@@ -1,5 +1,6 @@
 import axios, {
     type AxiosError,
+    AxiosHeaders,
     type AxiosInstance,
     type AxiosRequestConfig,
     type CancelTokenSource,
@@ -189,17 +190,10 @@ export default class Api {
                         if (newToken) {
                             this.setCSRFToken(newToken);
                             // Retry headers override defaults: replace the stale token here.
-                            // Callers may use AxiosHeaders from another Axios module instance.
-                            if (typeof config.headers?.set === 'function') {
-                                config.headers.set(this.csrfHeaderName, newToken);
-                            } else {
-                                config.headers = Object.fromEntries(
-                                    Object.entries(config.headers ?? {}).filter(
-                                        ([name]) => name.toLowerCase() !== csrfHeaderName,
-                                    ),
-                                );
-                                config.headers[this.csrfHeaderName] = newToken;
-                            }
+                            config.headers = AxiosHeaders.from(config.headers).set(
+                                this.csrfHeaderName,
+                                newToken,
+                            );
                         }
 
                         return this._axios({
