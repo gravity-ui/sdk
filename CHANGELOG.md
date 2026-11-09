@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.2.0](https://github.com/gravity-ui/sdk/compare/v2.1.1...v2.2.0) (2026-11-09)
+
+
+### Features
+
+* support streaming responses with the stream option ([#36](https://github.com/gravity-ui/sdk/issues/36)) ([5fbb66e](https://github.com/gravity-ui/sdk/commit/5fbb66eee000c0944999222c29203b2b53509970))
+
 ## [2.1.1](https://github.com/gravity-ui/sdk/compare/v2.1.0...v2.1.1) (2026-11-02)
 
 
