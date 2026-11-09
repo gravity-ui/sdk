@@ -1,3 +1,6 @@
+import {type Server, createServer} from 'http';
+import type {AddressInfo} from 'net';
+
 import axios, {type AxiosRequestConfig} from 'axios';
 import nock from 'nock';
 
@@ -6,6 +9,7 @@ import {GatewayError} from './models/common';
 import sdkFactory from './index';
 
 axios.defaults.adapter = 'http';
+axios.defaults.baseURL = 'http://localhost';
 
 const baseSchema = {
     root: {
@@ -343,6 +347,55 @@ describe('sdk', () => {
             expect(Date.now() - start).toBeLessThan(500);
         },
     );
+});
+
+describe('stream', () => {
+    let server: Server;
+    let endpoint: string;
+    let sendRest: () => void;
+
+    beforeAll(async () => {
+        server = createServer((req, res) => {
+            if (req.url?.endsWith('/getTool')) {
+                res.writeHead(403, {'content-type': 'application/json'});
+                res.end(JSON.stringify({status: 403, code: 'FORBIDDEN', message: 'No access'}));
+                return;
+            }
+            res.writeHead(200, {'content-type': 'text/plain'});
+            res.write('chunk1');
+            sendRest = () => res.end('chunk2');
+        });
+        await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+        endpoint = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api`;
+    });
+
+    afterAll(() => {
+        server.close();
+    });
+
+    test('resolves with the body stream before the response ends', async () => {
+        const sdk = sdkFactory<typeof baseSchema>({endpoint});
+
+        const stream = await sdk.rootService.getRoot(undefined, {stream: true});
+        const reader = stream.pipeThrough(new TextDecoderStream()).getReader();
+
+        expect((await reader.read()).value).toBe('chunk1');
+        sendRest();
+        expect((await reader.read()).value).toBe('chunk2');
+        expect((await reader.read()).done).toBe(true);
+    });
+
+    test('parses the gateway error from the stream body', async () => {
+        const sdk = sdkFactory<typeof baseSchema>({endpoint});
+
+        await expect(sdk.tool.toolService.getTool(undefined, {stream: true})).rejects.toMatchObject(
+            {
+                status: 403,
+                code: 'FORBIDDEN',
+                message: 'No access',
+            },
+        );
+    });
 });
 
 describe('csrf retry', () => {

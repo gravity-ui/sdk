@@ -26,6 +26,10 @@ export interface SdkActionOptions {
     signal?: AbortSignal;
 }
 
+export interface SdkStreamActionOptions extends SdkActionOptions {
+    stream: true;
+}
+
 export interface SdkActionFunc<TRequestData, TResponseData> {
     (data: TRequestData, options?: SdkActionOptions): CancellablePromise<TResponseData>;
 }
@@ -67,7 +71,10 @@ const DEFAULT_ENDPOINT: Required<SdkConfig>['endpoint'] = '/api';
 const DEFAULT_DECORATOR: Required<SdkConfig>['decorator'] = (func) => func;
 const DEFAULT_METHOD = 'POST';
 
-function getRequestOptions(options?: SdkActionOptions, axiosConfig?: AxiosRequestConfig) {
+function getRequestOptions(
+    options?: Partial<SdkStreamActionOptions>,
+    axiosConfig?: AxiosRequestConfig,
+) {
     const requestOptions = {
         concurrentId: generateConcurrentId(),
         requestConfig: {} as AxiosRequestConfig & Record<string, unknown>,
@@ -102,6 +109,18 @@ function getRequestOptions(options?: SdkActionOptions, axiosConfig?: AxiosReques
                 requestConfig: {
                     ...requestOptions.requestConfig,
                     signal: options.signal,
+                },
+            });
+        }
+
+        if (options.stream) {
+            Object.assign(requestOptions, {
+                requestConfig: {
+                    // The fetch adapter keeps the timeout running until the stream ends
+                    timeout: 0,
+                    ...requestOptions.requestConfig,
+                    adapter: 'fetch',
+                    responseType: 'stream',
                 },
             });
         }
@@ -147,20 +166,26 @@ function createSdkAction<TRequestData, TResponseData>(
     };
 }
 
-type SdkAction<TAction> = unknown extends ApiActionParams<TAction>
-    ? (
-          params?: ApiActionParams<TAction>,
-          options?: SdkActionOptions,
-      ) => CancellablePromise<ApiActionResponseType<TAction>>
-    : undefined extends ApiActionParams<TAction>
-    ? (
-          params?: ApiActionParams<TAction>,
-          options?: SdkActionOptions,
-      ) => CancellablePromise<ApiActionResponseType<TAction>>
-    : (
-          params: ApiActionParams<TAction>,
-          options?: SdkActionOptions,
-      ) => CancellablePromise<ApiActionResponseType<TAction>>;
+type SdkStreamAction<TAction> = (
+    params: ApiActionParams<TAction>,
+    options: SdkStreamActionOptions,
+) => CancellablePromise<ReadableStream<Uint8Array>>;
+
+type SdkAction<TAction> = SdkStreamAction<TAction> &
+    (unknown extends ApiActionParams<TAction>
+        ? (
+              params?: ApiActionParams<TAction>,
+              options?: SdkActionOptions,
+          ) => CancellablePromise<ApiActionResponseType<TAction>>
+        : undefined extends ApiActionParams<TAction>
+        ? (
+              params?: ApiActionParams<TAction>,
+              options?: SdkActionOptions,
+          ) => CancellablePromise<ApiActionResponseType<TAction>>
+        : (
+              params: ApiActionParams<TAction>,
+              options?: SdkActionOptions,
+          ) => CancellablePromise<ApiActionResponseType<TAction>>);
 
 export type ApiByScope<R extends SchemasByScope> = {
     [scope in keyof R]: ExtendedProperties<R[scope]>;

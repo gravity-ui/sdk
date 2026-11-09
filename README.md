@@ -93,8 +93,25 @@ interface SdkOptions {
   timeout?: number;
   // Ability to specify specific headers when making a call
   headers?: Record<string, unknown>;
+  // Abort the request, including a response stream that is being read
+  signal?: AbortSignal;
 }
 ```
+
+## Streaming Responses
+
+With `stream: true` the request goes through the axios fetch adapter, and the promise resolves with the response body as a `ReadableStream<Uint8Array>` as soon as the headers arrive. The gateway action must stream its response, e.g. a REST action with `responseType: 'stream'`.
+
+```typescript
+const stream = await sdk.<scope>.<service>.<action>(data, {stream: true, signal});
+const reader = stream.pipeThrough(new TextDecoderStream()).getReader();
+
+for (let chunk = await reader.read(); !chunk.done; chunk = await reader.read()) {
+  console.log(chunk.value);
+}
+```
+
+The timeout keeps running until the stream ends, so stream requests have no timeout unless `timeout` is passed. Once the response headers arrive, `cancel()` and `concurrentId` no longer affect the request: stop the stream with `signal` or `reader.cancel()`. Gateway errors are read from the body and rejected as usual; only `signal` aborts reading an error body.
 
 ## Invoking External Methods
 
