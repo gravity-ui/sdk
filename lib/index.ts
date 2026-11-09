@@ -19,6 +19,7 @@ export {ErrorCode, Lang} from './constants';
 
 export interface SdkActionOptions {
     concurrentId?: string;
+    /** @deprecated Has no effect: request collection is not supported. */
     collectRequest?: boolean;
     retries?: number;
     timeout?: number;
@@ -89,10 +90,6 @@ function getRequestOptions(
     if (options) {
         if (Object.prototype.hasOwnProperty.call(options, 'concurrentId')) {
             Object.assign(requestOptions, {concurrentId: options.concurrentId});
-        }
-
-        if (Object.prototype.hasOwnProperty.call(options, 'collectRequest')) {
-            Object.assign(requestOptions, {collectRequest: options.collectRequest});
         }
 
         if (options.retries !== undefined) {
